@@ -89,13 +89,13 @@ videoTexture.colorSpace = THREE.SRGBColorSpace;
 // 5. Генерация сфер проектов
 // ==========================================
 
-const SPHERE_COUNT = 10;
+const SPHERE_COUNT = 5;
 const SPHERE_RADIUS = 1;
 const ORBIT_DISTANCE = 11; // Расстояние от центра (10–12 единиц)
 
 const projects = Array.from({ length: SPHERE_COUNT }, (_, i) => ({
   name: `Project ${i + 1}`,
-  client: `Client ${i + 1}`,
+  client: 'Client – TEST',
 }));
 
 const spheres = [];
