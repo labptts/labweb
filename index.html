@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Universe</title>
+  <style>
+    /* Сброс стилей и полноэкранный холст */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    /* Модальное окно (overlay) */
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #modal-overlay.active {
+      display: flex;
+    }
+
+    #modal-content {
+      background: #111;
+      color: #fff;
+      padding: 40px 60px;
+      border-radius: 12px;
+      text-align: center;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 1.4rem;
+      max-width: 90%;
+      position: relative;
+    }
+
+    #modal-close {
+      position: absolute;
+      top: 10px;
+      right: 16px;
+      background: none;
+      border: none;
+      color: #aaa;
+      font-size: 1.6rem;
+      cursor: pointer;
+    }
+
+    #modal-close:hover {
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <!-- Модальное окно -->
+  <div id="modal-overlay">
+    <div id="modal-content">
+      <button id="modal-close">&times;</button>
+      <p id="modal-text"></p>
+    </div>
+  </div>
+
+  <!-- Точка входа -->
+  <script type="module" src="/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "labweb",
+  "version": "1.0.0",
+  "description": "Interactive Universe — 3D SPA with video spheres",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/labptts/labweb.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/labptts/labweb/issues"
+  },
+  "homepage": "https://github.com/labptts/labweb#readme",
+  "dependencies": {
+    "gsap": "^3.14.2",
+    "three": "^0.182.0",
+    "vite": "^7.3.1"
+  }
+}
