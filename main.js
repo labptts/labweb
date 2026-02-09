@@ -167,19 +167,40 @@ scene.add(nebula);
 // ==========================================
 
 const video = document.createElement('video');
-video.src = '/test_preview.mp4';
 video.crossOrigin = 'anonymous';
 video.loop = true;
 video.muted = true;
 video.playsInline = true;
-video.play().catch(() => {
-  document.addEventListener('click', () => video.play(), { once: true });
-});
+video.preload = 'auto';
+video.setAttribute('playsinline', '');
+video.setAttribute('webkit-playsinline', '');
+video.src = '/test_preview.mp4';
+
+// Надёжный запуск видео
+function tryPlayVideo() {
+  const p = video.play();
+  if (p !== undefined) {
+    p.catch(() => {
+      // Автоплей заблокирован — ждём взаимодействия
+      const startOnInteraction = () => {
+        video.play();
+        document.removeEventListener('click', startOnInteraction);
+        document.removeEventListener('touchstart', startOnInteraction);
+      };
+      document.addEventListener('click', startOnInteraction);
+      document.addEventListener('touchstart', startOnInteraction);
+    });
+  }
+}
+
+video.addEventListener('canplaythrough', tryPlayVideo);
+video.load();
 
 const videoTexture = new THREE.VideoTexture(video);
 videoTexture.minFilter = THREE.LinearFilter;
 videoTexture.magFilter = THREE.LinearFilter;
 videoTexture.colorSpace = THREE.SRGBColorSpace;
+videoTexture.generateMipmaps = false;
 
 // ==========================================
 // 8. Billboard-текст (Sprite — всегда к камере)
@@ -275,19 +296,19 @@ projects.forEach((project, i) => {
 
   group.position.set(x, posY, z);
 
-  // Сфера — стеклянный материал с видео
+  // Сфера — видео-текстура с лёгким glass-эффектом
   const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 64);
   const material = new THREE.MeshPhysicalMaterial({
     map: videoTexture,
-    roughness: 0.1,
+    emissiveMap: videoTexture,
+    emissive: new THREE.Color(0xffffff),
+    emissiveIntensity: 0.6,
+    roughness: 0.25,
     metalness: 0.0,
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.05,
-    reflectivity: 0.9,
-    envMapIntensity: 1.5,
-    ior: 1.5,
-    emissive: new THREE.Color(0x1a1a3e),
-    emissiveIntensity: 0.15,
+    clearcoat: 0.5,
+    clearcoatRoughness: 0.1,
+    reflectivity: 0.3,
+    envMapIntensity: 0.5,
   });
 
   const mesh = new THREE.Mesh(geometry, material);
