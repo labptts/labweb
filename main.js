@@ -70,7 +70,7 @@ scene.add(createStarField());
 // ==========================================
 
 const video = document.createElement('video');
-video.src = './test_preview.mp4';
+video.src = '/videos/preview.mp4';
 video.crossOrigin = 'anonymous';
 video.loop = true;
 video.muted = true;
