@@ -57,7 +57,7 @@ controls.enableZoom = false;
 controls.enablePan = false;
 controls.enableDamping = true;
 controls.dampingFactor = 0.04;
-controls.rotateSpeed = 0.35;
+controls.rotateSpeed = -0.35; // Инвертированное управление (drag-стиль)
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.15;
 
