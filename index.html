@@ -26,6 +26,56 @@
       display: block;
     }
 
+    /* Навигация сверху */
+    #top-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      z-index: 50;
+      pointer-events: none;
+    }
+
+    #top-nav a,
+    #top-nav span {
+      pointer-events: auto;
+    }
+
+    .nav-link {
+      color: rgba(255, 255, 255, 0.7);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+      transition: color 0.3s, text-shadow 0.3s;
+      cursor: pointer;
+    }
+
+    .nav-link:hover {
+      color: rgba(255, 255, 255, 1);
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+    }
+
+    #nav-logo {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      height: 36px;
+      filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.3))
+              drop-shadow(0 0 30px rgba(180, 200, 255, 0.2));
+      transition: filter 0.3s;
+    }
+
+    #nav-logo:hover {
+      filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.5))
+              drop-shadow(0 0 40px rgba(180, 200, 255, 0.35));
+    }
+
     /* Модальное окно — premium glass */
     #modal-overlay {
       display: none;
@@ -98,6 +148,13 @@
   </style>
 </head>
 <body>
+  <!-- Навигация сверху -->
+  <nav id="top-nav">
+    <a href="#" class="nav-link" id="nav-project-list">Project List View</a>
+    <img src="/Logo_lab_web.svg" alt="LAB" id="nav-logo">
+    <a href="#" class="nav-link" id="nav-download">Download .pdf</a>
+  </nav>
+
   <!-- Виньетка поверх сцены -->
   <div id="vignette"></div>
 
