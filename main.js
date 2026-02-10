@@ -525,44 +525,90 @@ const earthScene = createEarthWithAtmosphere();
 scene.add(earthScene.group);
 
 // ==========================================
-// 7. Видео-текстура
+// 7. Видео-текстуры для проектов
 // ==========================================
 
-const video = document.createElement('video');
-video.crossOrigin = 'anonymous';
-video.loop = true;
-video.muted = true;
-video.playsInline = true;
-video.preload = 'auto';
-video.setAttribute('playsinline', '');
-video.setAttribute('webkit-playsinline', '');
-video.src = '/test_preview.mp4';
-
-// Надёжный запуск видео
-function tryPlayVideo() {
-  const p = video.play();
-  if (p !== undefined) {
-    p.catch(() => {
-      // Автоплей заблокирован — ждём взаимодействия
-      const startOnInteraction = () => {
-        video.play();
-        document.removeEventListener('click', startOnInteraction);
-        document.removeEventListener('touchstart', startOnInteraction);
-      };
-      document.addEventListener('click', startOnInteraction);
-      document.addEventListener('touchstart', startOnInteraction);
-    });
+// Данные проектов с реальными видео
+const projectsData = [
+  {
+    video: '/videos/DelimobilDooh_LAB_WEB.mp4',
+    client: 'Delimobil',
+    subtitle: 'DOOH in Style',
+    type: 'DOOH'
+  },
+  {
+    video: '/videos/FonbetKHL_LAB_WEB.mp4',
+    client: 'Fonbet KZ',
+    subtitle: 'KHL moments',
+    type: 'TV, OLV'
+  },
+  {
+    video: '/videos/OakleyPlantaris_LAB_WEB.mp4',
+    client: 'Oakley',
+    subtitle: 'Plantaris launch',
+    type: 'OLV'
+  },
+  {
+    video: '/videos/Samolet360_LAB_WEB.mp4',
+    client: 'Samolet',
+    subtitle: 'Neighbourhood 360',
+    type: 'TV, OLV, DOOH'
+  },
+  {
+    video: '/videos/TbankNY_LAB_WEB.mp4',
+    client: 'T-Bank',
+    subtitle: 'New Year wish',
+    type: 'OLV, DOOH'
   }
+];
+
+// Создаёт видео элемент и текстуру для проекта
+function createVideoTexture(videoSrc) {
+  const video = document.createElement('video');
+  video.crossOrigin = 'anonymous';
+  video.loop = true;
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.setAttribute('playsinline', '');
+  video.setAttribute('webkit-playsinline', '');
+  video.src = videoSrc;
+
+  // Надёжный запуск видео
+  function tryPlayVideo() {
+    const p = video.play();
+    if (p !== undefined) {
+      p.catch(() => {
+        // Автоплей заблокирован — ждём взаимодействия
+        const startOnInteraction = () => {
+          video.play();
+          document.removeEventListener('click', startOnInteraction);
+          document.removeEventListener('touchstart', startOnInteraction);
+        };
+        document.addEventListener('click', startOnInteraction);
+        document.addEventListener('touchstart', startOnInteraction);
+      });
+    }
+  }
+
+  video.addEventListener('canplaythrough', tryPlayVideo);
+  video.load();
+
+  const texture = new THREE.VideoTexture(video);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = false;
+  
+  // Центрирование видео на фронтальной части сферы
+  texture.center.set(0.5, 0.5);
+  texture.offset.set(0.25, 0); // Сдвиг чтобы центр видео был спереди
+
+  return { video, texture };
 }
 
-video.addEventListener('canplaythrough', tryPlayVideo);
-video.load();
-
-const videoTexture = new THREE.VideoTexture(video);
-videoTexture.minFilter = THREE.LinearFilter;
-videoTexture.magFilter = THREE.LinearFilter;
-videoTexture.colorSpace = THREE.SRGBColorSpace;
-videoTexture.generateMipmaps = false;
+// Создаём текстуры для всех проектов
+const videoTextures = projectsData.map(p => createVideoTexture(p.video));
 
 // ==========================================
 // 8. Billboard-текст (Sprite — всегда к камере)
@@ -643,10 +689,11 @@ const SPHERE_COUNT = 5;
 const SPHERE_RADIUS = 1.2;
 const ORBIT_DISTANCE = 12;
 
-const projects = Array.from({ length: SPHERE_COUNT }, (_, i) => ({
+const projects = projectsData.map((p, i) => ({
   name: `Project ${i + 1}`,
-  client: 'Client',
-  subtitle: 'Test',
+  client: p.client,
+  subtitle: p.subtitle,
+  type: p.type,
 }));
 
 const spheres = [];
@@ -674,9 +721,10 @@ projects.forEach((project, i) => {
 
   // Сфера — видео-текстура с лёгким glass-эффектом
   const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 64);
+  const projectVideoTexture = videoTextures[i].texture;
   const material = new THREE.MeshPhysicalMaterial({
-    map: videoTexture,
-    emissiveMap: videoTexture,
+    map: projectVideoTexture,
+    emissiveMap: projectVideoTexture,
     emissive: new THREE.Color(0xffffff),
     emissiveIntensity: 0.6,
     roughness: 0.25,
@@ -699,7 +747,7 @@ projects.forEach((project, i) => {
   group.add(ring);
 
   // Billboard текст - будет позиционироваться в animate()
-  const label = createTextSprite(project.client, project.subtitle);
+  const label = createTextSprite(project.client, project.subtitle, project.type);
   // Храним метку отдельно в сцене, не в группе сферы
   label.userData.parentGroup = group;
   scene.add(label);
