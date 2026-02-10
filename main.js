@@ -65,23 +65,58 @@ controls.autoRotateSpeed = 0.15;
 // 4. Освещение (премиальное, холодные тона)
 // ==========================================
 
-const ambientLight = new THREE.AmbientLight(0x0a0a1a, 0.3);
+const ambientLight = new THREE.AmbientLight(0x0a0a1a, 0.5);
 scene.add(ambientLight);
 
-// Основной свет — мягкий холодный белый
-const keyLight = new THREE.PointLight(0xc8d4e8, 50, 120);
-keyLight.position.set(10, 10, 10);
+// Основной свет — DirectionalLight (не создаёт видимых артефактов)
+const keyLight = new THREE.DirectionalLight(0xfff8f0, 1.0);
+keyLight.position.set(-50, 30, -40);
 scene.add(keyLight);
 
-// Заполняющий свет — приглушённый синий
-const fillLight = new THREE.PointLight(0x4466aa, 25, 80);
-fillLight.position.set(-15, -5, -10);
+// Заполняющий свет
+const fillLight = new THREE.DirectionalLight(0x4466aa, 0.4);
+fillLight.position.set(15, -5, 10);
 scene.add(fillLight);
 
-// Контровый свет — лёгкий голубой
-const rimLight = new THREE.PointLight(0x6699cc, 35, 100);
-rimLight.position.set(0, 15, -15);
+// Контровый свет
+const rimLight = new THREE.DirectionalLight(0x6699cc, 0.5);
+rimLight.position.set(0, 15, 15);
 scene.add(rimLight);
+
+// Солнце (круглый Sprite — без квадратных артефактов)
+function createSunSprite() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  
+  // Радиальный градиент для круглого солнца
+  const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  gradient.addColorStop(0, 'rgba(255, 255, 250, 1)');
+  gradient.addColorStop(0.15, 'rgba(255, 250, 235, 1)');
+  gradient.addColorStop(0.4, 'rgba(255, 235, 200, 0.5)');
+  gradient.addColorStop(0.7, 'rgba(255, 210, 150, 0.15)');
+  gradient.addColorStop(1, 'rgba(255, 180, 100, 0)');
+  
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 256, 256);
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(20, 20, 1);
+  sprite.position.set(-60, 30, -100);
+  return sprite;
+}
+
+const sunSprite = createSunSprite();
+scene.add(sunSprite);
 
 // ==========================================
 // 5. Звёздное поле (многослойное)
@@ -258,106 +293,8 @@ function createEarthWithAtmosphere() {
   return { group: earthGroup, earthMaterial, earth };
 }
 
-// ==========================================
-// 6.1 Луна (полумесяц)
-// ==========================================
-
-function createCrescentMoon() {
-  const moonGroup = new THREE.Group();
-  
-  // Шейдерный материал для полумесяца
-  const moonMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-      uPhase: { value: 0.25 }, // Фаза луны (0-1)
-    },
-    vertexShader: `
-      varying vec2 vUv;
-      varying vec3 vNormal;
-      void main() {
-        vUv = uv;
-        vNormal = normalize(normalMatrix * normal);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform float uPhase;
-      varying vec2 vUv;
-      varying vec3 vNormal;
-      
-      void main() {
-        vec2 center = vUv - 0.5;
-        float dist = length(center);
-        
-        // Круглая маска луны
-        if (dist > 0.48) discard;
-        
-        // Создаём эффект полумесяца
-        float angle = atan(center.y, center.x);
-        float crescentMask = smoothstep(-0.15, 0.1, center.x + 0.2);
-        
-        // Мягкий край
-        float edge = 1.0 - smoothstep(0.4, 0.48, dist);
-        
-        // Цвет луны - мягкий серебристый
-        vec3 moonColor = vec3(0.85, 0.85, 0.82);
-        
-        // Лёгкие вариации на поверхности
-        float surface = 0.9 + 0.1 * sin(center.x * 15.0) * sin(center.y * 12.0);
-        
-        float alpha = crescentMask * edge * surface;
-        
-        gl_FragColor = vec4(moonColor, alpha * 0.9);
-      }
-    `,
-    transparent: true,
-    side: THREE.FrontSide,
-    depthWrite: false,
-  });
-  
-  const moonGeometry = new THREE.PlaneGeometry(3, 3);
-  const moon = new THREE.Mesh(moonGeometry, moonMaterial);
-  moon.position.set(-15, 5, -60);
-  moonGroup.add(moon);
-  
-  // Мягкое свечение вокруг луны
-  const glowGeometry = new THREE.PlaneGeometry(8, 8);
-  const glowMaterial = new THREE.ShaderMaterial({
-    uniforms: {},
-    vertexShader: `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      varying vec2 vUv;
-      void main() {
-        vec2 center = vUv - 0.5;
-        float dist = length(center);
-        float glow = exp(-dist * 4.0) * 0.15;
-        vec3 color = vec3(0.9, 0.9, 0.85);
-        gl_FragColor = vec4(color, glow);
-      }
-    `,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  
-  const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-  glow.position.copy(moon.position);
-  glow.position.z += 0.1;
-  moonGroup.add(glow);
-  
-  return moonGroup;
-}
-
 const earthScene = createEarthWithAtmosphere();
 scene.add(earthScene.group);
-
-const crescentMoon = createCrescentMoon();
-scene.add(crescentMoon);
 
 // ==========================================
 // 7. Видео-текстура
@@ -481,15 +418,20 @@ const sphereGroups = [];
 projects.forEach((project, i) => {
   const group = new THREE.Group();
 
-  // Равномерное распределение (Фибоначчи)
-  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-  const y = 1 - (2 * i) / (SPHERE_COUNT - 1);
-  const radiusAtY = Math.sqrt(1 - y * y);
-  const theta = goldenAngle * i;
-
-  const x = radiusAtY * Math.cos(theta) * ORBIT_DISTANCE;
-  const z = radiusAtY * Math.sin(theta) * ORBIT_DISTANCE;
-  const posY = y * ORBIT_DISTANCE;
+  // Хаотичное распределение в верхней полусфере (текст не залезает на Землю)
+  const presetPositions = [
+    { theta: 0.4, y: 0.75, r: 1.0 },
+    { theta: 2.3, y: 0.45, r: 0.95 },
+    { theta: 4.5, y: 0.85, r: 0.88 },
+    { theta: 1.5, y: 0.55, r: 1.08 },
+    { theta: 5.3, y: 0.3, r: 0.92 },
+  ];
+  const preset = presetPositions[i];
+  
+  const radiusAtY = Math.sqrt(1 - preset.y * preset.y) * preset.r;
+  const x = radiusAtY * Math.cos(preset.theta) * ORBIT_DISTANCE;
+  const z = radiusAtY * Math.sin(preset.theta) * ORBIT_DISTANCE;
+  const posY = preset.y * ORBIT_DISTANCE * 0.65;
 
   group.position.set(x, posY, z);
 
@@ -512,8 +454,10 @@ projects.forEach((project, i) => {
   mesh.userData = project;
   group.add(mesh);
 
-  // Единственное кольцо (фронтальное, всегда к камере)
-  const ring = createGlowRing(SPHERE_RADIUS, 0x8899bb, 1.25, 1.32, 0.12);
+  // Единственное кольцо (фронтальное, меньшее, ближе к сфере)
+  const ring = createGlowRing(SPHERE_RADIUS, 0x8899bb, 1.08, 1.12, 0.15);
+  ring.userData.defaultColor = new THREE.Color(0x8899bb);
+  ring.userData.hoverColor = new THREE.Color(0xB8FF00);
   // Кольцо будет ориентироваться в animate()
   group.add(ring);
 
@@ -559,15 +503,29 @@ function checkHover() {
 
   if (hoveredSphere && hoveredSphere !== target) {
     const prevGroup = hoveredSphere.parent;
+    const prevRing = prevGroup.userData.ring;
     gsap.to(prevGroup.scale, { x: 1, y: 1, z: 1, duration: 0.5, ease: 'power2.out' });
-    gsap.to(prevGroup.userData.ring.material, { opacity: 0.12, duration: 0.4 });
+    gsap.to(prevRing.material, { opacity: 0.15, duration: 0.4 });
+    gsap.to(prevRing.material.color, {
+      r: prevRing.userData.defaultColor.r,
+      g: prevRing.userData.defaultColor.g,
+      b: prevRing.userData.defaultColor.b,
+      duration: 0.4
+    });
     renderer.domElement.style.cursor = 'default';
   }
 
   if (target && target !== hoveredSphere) {
     const group = target.parent;
+    const ring = group.userData.ring;
     gsap.to(group.scale, { x: 1.15, y: 1.15, z: 1.15, duration: 0.5, ease: 'power2.out' });
-    gsap.to(group.userData.ring.material, { opacity: 0.7, duration: 0.4 });
+    gsap.to(ring.material, { opacity: 0.9, duration: 0.4 });
+    gsap.to(ring.material.color, {
+      r: ring.userData.hoverColor.r,
+      g: ring.userData.hoverColor.g,
+      b: ring.userData.hoverColor.b,
+      duration: 0.4
+    });
     renderer.domElement.style.cursor = 'pointer';
   }
 
@@ -673,11 +631,6 @@ function animate() {
     earthScene.earthMaterial.uniforms.uCameraPos.value.copy(camera.position);
     earthScene.earthMaterial.uniforms.uTime.value = elapsed;
   }
-
-  // Движение источников света
-  keyLight.position.x = 10 * Math.cos(elapsed * 0.1);
-  keyLight.position.z = 10 * Math.sin(elapsed * 0.1);
-  fillLight.position.y = -5 + Math.sin(elapsed * 0.15) * 3;
 
   controls.update();
   checkHover();
