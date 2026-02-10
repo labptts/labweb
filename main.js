@@ -340,13 +340,22 @@ videoTexture.generateMipmaps = false;
 // 8. Billboard-текст (Sprite — всегда к камере)
 // ==========================================
 
-function createTextSprite(line1, line2) {
+function createTextSprite(line1, line2, projectType = 'TV / DOOH') {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 256;
   const ctx = canvas.getContext('2d');
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Тип проекта — справа сверху, мелкий тонкий шрифт
+  ctx.font = '300 24px "Inter", "SF Pro Display", "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  ctx.shadowColor = 'rgba(100, 140, 180, 0.3)';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = 'rgba(180, 200, 220, 0.7)';
+  ctx.fillText(projectType, 490, 20);
 
   // Линия 1 — крупный жирный
   ctx.font = '700 64px "Inter", "SF Pro Display", "Segoe UI", Arial, sans-serif';
