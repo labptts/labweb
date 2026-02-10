@@ -122,7 +122,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(0, 0, 0, 0.85);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       z-index: 100;
@@ -135,37 +135,110 @@
     }
 
     #modal-content {
-      background: rgba(20, 20, 40, 0.7);
-      border: 1px solid rgba(108, 99, 255, 0.25);
+      background: rgba(15, 15, 25, 0.9);
+      border: 1px solid rgba(108, 99, 255, 0.2);
       color: #fff;
-      padding: 48px 72px;
-      border-radius: 20px;
-      text-align: center;
-      font-size: 1.3rem;
-      font-weight: 300;
-      letter-spacing: 0.03em;
-      max-width: 90%;
+      border-radius: 16px;
+      max-width: 900px;
+      width: 90%;
+      max-height: 90vh;
       position: relative;
+      overflow: hidden;
       box-shadow:
-        0 0 60px rgba(108, 99, 255, 0.15),
-        0 0 120px rgba(0, 212, 255, 0.05),
-        inset 0 0 60px rgba(108, 99, 255, 0.05);
+        0 0 80px rgba(108, 99, 255, 0.15),
+        0 0 160px rgba(0, 212, 255, 0.05);
+    }
+
+    .modal-video-container {
+      position: relative;
+      width: 100%;
+      padding-top: 56.25%; /* 16:9 */
+      background: #000;
+    }
+
+    .modal-video-container iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .modal-info {
+      padding: 24px 32px 32px;
+    }
+
+    .modal-type {
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      color: rgba(180, 200, 220, 0.6);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .modal-client {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0 0 4px;
+      letter-spacing: -0.01em;
+    }
+
+    .modal-subtitle {
+      font-size: 16px;
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.7);
+      margin: 0;
     }
 
     #modal-close {
       position: absolute;
-      top: 12px;
-      right: 18px;
-      background: none;
-      border: none;
-      color: rgba(255, 255, 255, 0.4);
-      font-size: 1.8rem;
+      top: 16px;
+      right: 16px;
+      width: 40px;
+      height: 40px;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 24px;
       cursor: pointer;
-      transition: color 0.2s;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
     }
 
     #modal-close:hover {
+      background: rgba(255, 255, 255, 0.1);
       color: #fff;
+    }
+
+    @media (max-width: 600px) {
+      #modal-content {
+        width: 95%;
+        max-height: 85vh;
+      }
+
+      .modal-info {
+        padding: 16px 20px 24px;
+      }
+
+      .modal-client {
+        font-size: 22px;
+      }
+
+      .modal-subtitle {
+        font-size: 14px;
+      }
+
+      #modal-close {
+        top: 12px;
+        right: 12px;
+        width: 36px;
+        height: 36px;
+      }
     }
 
     /* Виньетка */
@@ -199,8 +272,7 @@
   <!-- Модальное окно -->
   <div id="modal-overlay">
     <div id="modal-content">
-      <button id="modal-close">&times;</button>
-      <p id="modal-text"></p>
+      <!-- Контент генерируется динамически в main.js -->
     </div>
   </div>
 

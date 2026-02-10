@@ -110,10 +110,10 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableZoom = false;
 controls.enablePan = false;
 controls.enableDamping = true;
-controls.dampingFactor = 0.04;
-controls.rotateSpeed = -0.35; // Инвертированное управление (drag-стиль)
+controls.dampingFactor = 0.06;
+controls.rotateSpeed = -0.4; // Инвертированное управление (drag-стиль)
 controls.autoRotate = true;
-controls.autoRotateSpeed = 0.15;
+controls.autoRotateSpeed = 0.08;
 
 // ==========================================
 // 4. Освещение (премиальное, холодные тона)
@@ -534,31 +534,51 @@ const projectsData = [
     video: '/videos/DelimobilDooh_LAB_WEB.mp4',
     client: 'Delimobil',
     subtitle: 'DOOH in Style',
-    type: 'DOOH'
+    type: 'DOOH',
+    content: {
+      type: 'video',
+      vimeoId: '1163618338'
+    }
   },
   {
     video: '/videos/FonbetKHL_LAB_WEB.mp4',
     client: 'Fonbet KZ',
     subtitle: 'KHL moments',
-    type: 'TV, OLV'
+    type: 'TV, OLV',
+    content: {
+      type: 'video',
+      vimeoId: '1163618380'
+    }
   },
   {
     video: '/videos/OakleyPlantaris_LAB_WEB.mp4',
     client: 'Oakley',
     subtitle: 'Plantaris launch',
-    type: 'OLV'
+    type: 'OLV',
+    content: {
+      type: 'video',
+      vimeoId: '1163618518'
+    }
   },
   {
     video: '/videos/Samolet360_LAB_WEB.mp4',
     client: 'Samolet',
     subtitle: 'Neighbourhood 360',
-    type: 'TV, OLV, DOOH'
+    type: 'TV, OLV, DOOH',
+    content: {
+      type: 'video',
+      vimeoId: '1163618584'
+    }
   },
   {
     video: '/videos/TbankNY_LAB_WEB.mp4',
     client: 'T-Bank',
     subtitle: 'New Year wish',
-    type: 'OLV, DOOH'
+    type: 'OLV, DOOH',
+    content: {
+      type: 'video',
+      vimeoId: '1163618628'
+    }
   }
 ];
 
@@ -694,6 +714,7 @@ const projects = projectsData.map((p, i) => ({
   client: p.client,
   subtitle: p.subtitle,
   type: p.type,
+  content: p.content,
 }));
 
 const spheres = [];
@@ -823,8 +844,8 @@ function onClickOrTouch(clientX, clientY) {
   const intersects = raycaster.intersectObjects(spheres);
 
   if (intersects.length > 0) {
-    const { name, client, subtitle } = intersects[0].object.userData;
-    showModal(name, `${client} — ${subtitle}`);
+    const project = intersects[0].object.userData;
+    showModal(project);
   }
 }
 
@@ -844,21 +865,58 @@ renderer.domElement.addEventListener('touchend', (e) => {
 // ==========================================
 
 const modalOverlay = document.getElementById('modal-overlay');
-const modalText = document.getElementById('modal-text');
+const modalContent = document.getElementById('modal-content');
 const modalClose = document.getElementById('modal-close');
 
-function showModal(projectName, clientName) {
-  modalText.textContent = `${projectName} — ${clientName}`;
+function showModal(project) {
+  const { client, subtitle, type, content } = project;
+  
+  let mediaHtml = '';
+  if (content && content.type === 'video' && content.vimeoId) {
+    mediaHtml = `
+      <div class="modal-video-container">
+        <iframe 
+          src="https://player.vimeo.com/video/${content.vimeoId}?autoplay=1&loop=1&title=0&byline=0&portrait=0&dnt=1"
+          frameborder="0" 
+          allow="autoplay; fullscreen; picture-in-picture" 
+          allowfullscreen>
+        </iframe>
+      </div>
+    `;
+  }
+  
+  modalContent.innerHTML = `
+    <button id="modal-close">&times;</button>
+    ${mediaHtml}
+    <div class="modal-info">
+      <div class="modal-type">${type}</div>
+      <h2 class="modal-client">${client}</h2>
+      <p class="modal-subtitle">${subtitle}</p>
+    </div>
+  `;
+  
+  // Перепривязываем обработчик закрытия
+  document.getElementById('modal-close').addEventListener('click', hideModal);
+  
   modalOverlay.classList.add('active');
+  controls.autoRotate = false; // Останавливаем вращение
 }
 
 function hideModal() {
   modalOverlay.classList.remove('active');
+  modalContent.innerHTML = ''; // Очищаем для остановки видео
+  controls.autoRotate = true; // Возобновляем вращение
 }
 
-modalClose.addEventListener('click', hideModal);
 modalOverlay.addEventListener('click', (e) => {
   if (e.target === modalOverlay) hideModal();
+});
+
+// Закрытие по ESC
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && modalOverlay.classList.contains('active')) {
+    hideModal();
+  }
 });
 
 // ==========================================
