@@ -611,6 +611,9 @@ function animate() {
     const { baseY, phase, ring, label } = group.userData;
     group.position.y = baseY + Math.sin(elapsed * 0.4 + phase) * 0.5;
 
+    // Вся группа смотрит на камеру (сфера фронтально к зрителю)
+    group.lookAt(camera.position);
+
     // Кольцо всегда смотрит на камеру (фронтально)
     if (ring) {
       ring.lookAt(camera.position);
