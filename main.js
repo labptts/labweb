@@ -54,7 +54,7 @@ const FilmGrainShader = {
   uniforms: {
     tDiffuse: { value: null },
     uTime: { value: 0 },
-    uIntensity: { value: 0.06 },
+    uIntensity: { value: 0.04 },
   },
   vertexShader: `
     varying vec2 vUv;
@@ -79,12 +79,10 @@ const FilmGrainShader = {
       // Анимированный шум
       float grain = random(vUv * 1000.0 + uTime * 100.0) - 0.5;
       
-      // Применяем шум ТОЛЬКО к тёмным областям (космос, планета)
-      // Сферы, текст, солнце - исключаются
+      // Применяем шум к тёмным/средним областям (космос, планета, текст)
+      // Сферы и солнце (яркие) - исключаются
       float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-      
-      // Более агрессивная маска - grain только на очень тёмных областях
-      float grainMask = smoothstep(0.15, 0.02, luminance);
+      float grainMask = smoothstep(0.7, 0.2, luminance);
       
       color.rgb += grain * uIntensity * grainMask;
       
@@ -97,7 +95,7 @@ const grainPass = new ShaderPass(FilmGrainShader);
 
 // Уменьшаем grain на мобильных
 if (window.innerWidth < 768) {
-  grainPass.uniforms.uIntensity.value = 0.03;
+  grainPass.uniforms.uIntensity.value = 0.025;
 }
 
 composer.addPass(grainPass);
@@ -228,30 +226,22 @@ function createLensFlares() {
   
   const lensflare = new Lensflare();
   
-  // Основное свечение (уменьшено для круглой формы)
+  // Основное свечение (только круглые ореолы)
   const mainColor = new THREE.Color(1, 0.95, 0.8);
-  const flareMain = createCircleFlare(256, mainColor, 0.4);
-  lensflare.addElement(new LensflareElement(flareMain, 80, 0, mainColor));
+  const flareMain = createCircleFlare(256, mainColor, 0.35);
+  lensflare.addElement(new LensflareElement(flareMain, 60, 0, mainColor));
   
-  // Анаморфные горизонтальные блики (характерные для кино)
-  const anamorphicColor = new THREE.Color(0.8, 0.9, 1.0);
-  const anamorphic1 = createFlareTexture(512, 32, anamorphicColor, 0.15);
-  lensflare.addElement(new LensflareElement(anamorphic1, 800, 0, anamorphicColor));
+  // Вторичные цветные блики по линии (только круглые)
+  const blueFlare = createCircleFlare(64, new THREE.Color(0.4, 0.6, 1.0), 0.25);
+  lensflare.addElement(new LensflareElement(blueFlare, 30, 0.3));
+  lensflare.addElement(new LensflareElement(blueFlare, 20, 0.5));
   
-  const anamorphic2 = createFlareTexture(256, 16, new THREE.Color(0.9, 0.95, 1.0), 0.1);
-  lensflare.addElement(new LensflareElement(anamorphic2, 500, 0.1));
+  const cyanFlare = createCircleFlare(64, new THREE.Color(0.5, 0.9, 1.0), 0.15);
+  lensflare.addElement(new LensflareElement(cyanFlare, 40, 0.7));
   
-  // Вторичные цветные блики по линии
-  const blueFlare = createCircleFlare(64, new THREE.Color(0.4, 0.6, 1.0), 0.3);
-  lensflare.addElement(new LensflareElement(blueFlare, 40, 0.3));
-  lensflare.addElement(new LensflareElement(blueFlare, 30, 0.5));
-  
-  const cyanFlare = createCircleFlare(64, new THREE.Color(0.5, 0.9, 1.0), 0.2);
-  lensflare.addElement(new LensflareElement(cyanFlare, 60, 0.7));
-  
-  const orangeFlare = createCircleFlare(64, new THREE.Color(1.0, 0.7, 0.3), 0.15);
-  lensflare.addElement(new LensflareElement(orangeFlare, 35, 0.9));
-  lensflare.addElement(new LensflareElement(orangeFlare, 25, 1.1));
+  const orangeFlare = createCircleFlare(64, new THREE.Color(1.0, 0.7, 0.3), 0.12);
+  lensflare.addElement(new LensflareElement(orangeFlare, 25, 0.9));
+  lensflare.addElement(new LensflareElement(orangeFlare, 18, 1.1));
   
   // Позиционируем в точке солнца
   lensflare.position.set(-60, 30, -100);
@@ -838,7 +828,7 @@ window.addEventListener('resize', () => {
   bloomPass.resolution.set(w, h);
   
   // Уменьшаем grain на мобильных
-  grainPass.uniforms.uIntensity.value = w < 768 ? 0.03 : 0.06;
+  grainPass.uniforms.uIntensity.value = w < 768 ? 0.025 : 0.04;
 });
 
 // ==========================================
