@@ -55,6 +55,7 @@ const FilmGrainShader = {
     tDiffuse: { value: null },
     uTime: { value: 0 },
     uIntensity: { value: 0.04 },
+    uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
   },
   vertexShader: `
     varying vec2 vUv;
@@ -67,20 +68,26 @@ const FilmGrainShader = {
     uniform sampler2D tDiffuse;
     uniform float uTime;
     uniform float uIntensity;
+    uniform vec2 uResolution;
     varying vec2 vUv;
     
-    float random(vec2 p) {
-      return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+    // Улучшенная хэш-функция для более равномерного шума
+    float hash(vec2 p) {
+      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.x + p3.y) * p3.z);
     }
     
     void main() {
       vec4 color = texture2D(tDiffuse, vUv);
       
-      // Анимированный шум
-      float grain = random(vUv * 1000.0 + uTime * 100.0) - 0.5;
+      // Используем экранные координаты для равномерного шума
+      vec2 screenCoord = gl_FragCoord.xy;
       
-      // Применяем шум к тёмным/средним областям (космос, планета, текст)
-      // Сферы и солнце (яркие) - исключаются
+      // Анимированный шум с временной вариацией
+      float grain = hash(screenCoord + fract(uTime * 43.0) * 100.0) - 0.5;
+      
+      // Применяем шум к тёмным/средним областям
       float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
       float grainMask = smoothstep(0.7, 0.2, luminance);
       
@@ -95,7 +102,7 @@ const grainPass = new ShaderPass(FilmGrainShader);
 
 // Уменьшаем grain на мобильных
 if (window.innerWidth < 768) {
-  grainPass.uniforms.uIntensity.value = 0.025;
+  grainPass.uniforms.uIntensity.value = 0.018;
 }
 
 composer.addPass(grainPass);
@@ -933,8 +940,9 @@ window.addEventListener('resize', () => {
   composer.setSize(w, h);
   bloomPass.resolution.set(w, h);
   
-  // Уменьшаем grain на мобильных
-  grainPass.uniforms.uIntensity.value = w < 768 ? 0.025 : 0.04;
+  // Обновляем grain для мобильных
+  grainPass.uniforms.uIntensity.value = w < 768 ? 0.018 : 0.04;
+  grainPass.uniforms.uResolution.value.set(w, h);
 });
 
 // ==========================================
