@@ -4,6 +4,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
 import { gsap } from 'gsap';
 
 // ==========================================
@@ -46,6 +48,51 @@ const bloomPass = new UnrealBloomPass(
   0.2    // threshold
 );
 composer.addPass(bloomPass);
+
+// Film Grain шейдер
+const FilmGrainShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uTime: { value: 0 },
+    uIntensity: { value: 0.08 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    uniform float uIntensity;
+    varying vec2 vUv;
+    
+    float random(vec2 p) {
+      return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+    }
+    
+    void main() {
+      vec4 color = texture2D(tDiffuse, vUv);
+      
+      // Анимированный шум
+      float grain = random(vUv * 1000.0 + uTime * 100.0) - 0.5;
+      
+      // Применяем шум только к тёмным/средним областям, сферы остаются чистыми
+      float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+      float grainMask = smoothstep(0.8, 0.3, luminance);
+      
+      color.rgb += grain * uIntensity * grainMask;
+      
+      gl_FragColor = color;
+    }
+  `
+};
+
+const grainPass = new ShaderPass(FilmGrainShader);
+composer.addPass(grainPass);
+
 composer.addPass(new OutputPass());
 
 // ==========================================
@@ -118,12 +165,105 @@ function createSunSprite() {
 const sunSprite = createSunSprite();
 scene.add(sunSprite);
 
+// Анаморфные lens flares от солнца
+function createLensFlares() {
+  // Создаём текстуры для бликов программно
+  function createFlareTexture(width, height, color, opacity) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    // Горизонтальный анаморфный блик
+    const gradient = ctx.createLinearGradient(0, height/2, width, height/2);
+    gradient.addColorStop(0, `rgba(${color.r*255}, ${color.g*255}, ${color.b*255}, 0)`);
+    gradient.addColorStop(0.3, `rgba(${color.r*255}, ${color.g*255}, ${color.b*255}, ${opacity})`);
+    gradient.addColorStop(0.5, `rgba(${color.r*255}, ${color.g*255}, ${color.b*255}, ${opacity * 1.5})`);
+    gradient.addColorStop(0.7, `rgba(${color.r*255}, ${color.g*255}, ${color.b*255}, ${opacity})`);
+    gradient.addColorStop(1, `rgba(${color.r*255}, ${color.g*255}, ${color.b*255}, 0)`);
+    
+    ctx.fillStyle = gradient;
+    
+    // Вертикальный градиент для мягкости
+    const vertGradient = ctx.createLinearGradient(0, 0, 0, height);
+    vertGradient.addColorStop(0, 'rgba(0,0,0,0)');
+    vertGradient.addColorStop(0.4, 'rgba(255,255,255,1)');
+    vertGradient.addColorStop(0.6, 'rgba(255,255,255,1)');
+    vertGradient.addColorStop(1, 'rgba(0,0,0,0)');
+    
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.fillStyle = vertGradient;
+    ctx.fillRect(0, 0, width, height);
+    
+    return new THREE.CanvasTexture(canvas);
+  }
+  
+  // Круглый блик для центра
+  function createCircleFlare(size, color, opacity) {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    const gradient = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    gradient.addColorStop(0, `rgba(${color.r*255}, ${color.g*255}, ${color.b*255}, ${opacity})`);
+    gradient.addColorStop(0.5, `rgba(${color.r*255}, ${color.g*255}, ${color.b*255}, ${opacity * 0.3})`);
+    gradient.addColorStop(1, 'rgba(0,0,0,0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+    
+    return new THREE.CanvasTexture(canvas);
+  }
+  
+  const lensflare = new Lensflare();
+  
+  // Основное свечение
+  const mainColor = new THREE.Color(1, 0.95, 0.8);
+  const flareMain = createCircleFlare(256, mainColor, 0.6);
+  lensflare.addElement(new LensflareElement(flareMain, 150, 0, mainColor));
+  
+  // Анаморфные горизонтальные блики (характерные для кино)
+  const anamorphicColor = new THREE.Color(0.8, 0.9, 1.0);
+  const anamorphic1 = createFlareTexture(512, 32, anamorphicColor, 0.15);
+  lensflare.addElement(new LensflareElement(anamorphic1, 800, 0, anamorphicColor));
+  
+  const anamorphic2 = createFlareTexture(256, 16, new THREE.Color(0.9, 0.95, 1.0), 0.1);
+  lensflare.addElement(new LensflareElement(anamorphic2, 500, 0.1));
+  
+  // Вторичные цветные блики по линии
+  const blueFlare = createCircleFlare(64, new THREE.Color(0.4, 0.6, 1.0), 0.3);
+  lensflare.addElement(new LensflareElement(blueFlare, 40, 0.3));
+  lensflare.addElement(new LensflareElement(blueFlare, 30, 0.5));
+  
+  const cyanFlare = createCircleFlare(64, new THREE.Color(0.5, 0.9, 1.0), 0.2);
+  lensflare.addElement(new LensflareElement(cyanFlare, 60, 0.7));
+  
+  const orangeFlare = createCircleFlare(64, new THREE.Color(1.0, 0.7, 0.3), 0.15);
+  lensflare.addElement(new LensflareElement(orangeFlare, 35, 0.9));
+  lensflare.addElement(new LensflareElement(orangeFlare, 25, 1.1));
+  
+  // Позиционируем в точке солнца
+  lensflare.position.set(-60, 30, -100);
+  
+  return lensflare;
+}
+
+const lensFlares = createLensFlares();
+scene.add(lensFlares);
+
 // ==========================================
-// 5. Звёздное поле (многослойное)
+// 5. Звёздное поле (многослойное с мерцанием)
 // ==========================================
 
-function createStarLayer(count, minR, maxR, size, color, opacity) {
+const starLayers = [];
+
+function createTwinklingStarLayer(count, minR, maxR, size, color, opacity) {
   const positions = new Float32Array(count * 3);
+  const phases = new Float32Array(count); // Фаза мерцания для каждой звезды
+  const speeds = new Float32Array(count); // Скорость мерцания
+  
   for (let i = 0; i < count; i++) {
     const r = minR + Math.random() * (maxR - minR);
     const theta = Math.random() * Math.PI * 2;
@@ -131,25 +271,114 @@ function createStarLayer(count, minR, maxR, size, color, opacity) {
     positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
     positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
     positions[i * 3 + 2] = r * Math.cos(phi);
+    phases[i] = Math.random() * Math.PI * 2;
+    speeds[i] = 0.5 + Math.random() * 2.0; // Разная скорость мерцания
   }
+  
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const material = new THREE.PointsMaterial({
-    color,
-    size,
-    sizeAttenuation: true,
+  geometry.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
+  geometry.setAttribute('aSpeed', new THREE.BufferAttribute(speeds, 1));
+  
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(color) },
+      uSize: { value: size },
+      uOpacity: { value: opacity },
+      uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+    },
+    vertexShader: `
+      uniform float uTime;
+      uniform float uSize;
+      uniform float uPixelRatio;
+      attribute float aPhase;
+      attribute float aSpeed;
+      varying float vTwinkle;
+      
+      void main() {
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        
+        // Мерцание
+        vTwinkle = 0.5 + 0.5 * sin(uTime * aSpeed + aPhase);
+        
+        gl_PointSize = uSize * uPixelRatio * (300.0 / -mvPosition.z);
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying float vTwinkle;
+      
+      void main() {
+        // Круглая точка
+        float dist = length(gl_PointCoord - vec2(0.5));
+        if (dist > 0.5) discard;
+        
+        float alpha = smoothstep(0.5, 0.0, dist);
+        alpha *= uOpacity * vTwinkle;
+        
+        gl_FragColor = vec4(uColor, alpha);
+      }
+    `,
     transparent: true,
-    opacity,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
-  return new THREE.Points(geometry, material);
+  
+  const points = new THREE.Points(geometry, material);
+  starLayers.push(points);
+  return points;
 }
 
-// Более премиальные звёзды - меньше и тоньше
-scene.add(createStarLayer(400, 80, 200, 0.4, 0xffffff, 0.9));
-scene.add(createStarLayer(800, 60, 220, 0.2, 0xddeeff, 0.5));
-scene.add(createStarLayer(1500, 50, 250, 0.1, 0xaabbdd, 0.25));
+// Более премиальные звёзды - меньше и тоньше, с мерцанием
+scene.add(createTwinklingStarLayer(400, 80, 200, 0.4, 0xffffff, 0.9));
+scene.add(createTwinklingStarLayer(800, 60, 220, 0.2, 0xddeeff, 0.5));
+scene.add(createTwinklingStarLayer(1500, 50, 250, 0.1, 0xaabbdd, 0.25));
+
+// ==========================================
+// 5.5 Пылевые частицы (Dust Particles)
+// ==========================================
+
+function createDustParticles(count) {
+  const positions = new Float32Array(count * 3);
+  const velocities = [];
+  
+  for (let i = 0; i < count; i++) {
+    // Частицы в области вокруг камеры
+    positions[i * 3]     = (Math.random() - 0.5) * 40;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 20 + 5;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+    
+    velocities.push({
+      x: (Math.random() - 0.5) * 0.005,
+      y: (Math.random() - 0.5) * 0.003,
+      z: (Math.random() - 0.5) * 0.005,
+    });
+  }
+  
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  
+  const material = new THREE.PointsMaterial({
+    color: 0xaabbcc,
+    size: 0.03,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.4,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  
+  const points = new THREE.Points(geometry, material);
+  points.userData.velocities = velocities;
+  points.userData.positions = positions;
+  return points;
+}
+
+const dustParticles = createDustParticles(200);
+scene.add(dustParticles);
 
 // ==========================================
 // 6. Земля с атмосферой (вид из космоса)
@@ -606,10 +835,52 @@ window.addEventListener('resize', () => {
 
 const clock = new THREE.Clock();
 
+// Параметры для camera drift
+const cameraDrift = {
+  baseTarget: new THREE.Vector3(0, 0, 0),
+  offset: new THREE.Vector3(),
+};
+
 function animate() {
   requestAnimationFrame(animate);
 
   const elapsed = clock.getElapsedTime();
+
+  // Film Grain обновление времени
+  if (grainPass.uniforms.uTime) {
+    grainPass.uniforms.uTime.value = elapsed;
+  }
+  
+  // Обновляем мерцание звёзд
+  starLayers.forEach((layer) => {
+    if (layer.material.uniforms && layer.material.uniforms.uTime) {
+      layer.material.uniforms.uTime.value = elapsed;
+    }
+  });
+  
+  // Анимация пылевых частиц
+  if (dustParticles && dustParticles.userData.positions && dustParticles.userData.velocities) {
+    const positions = dustParticles.userData.positions;
+    const velocities = dustParticles.userData.velocities;
+    
+    for (let i = 0; i < velocities.length; i++) {
+      positions[i * 3] += velocities[i].x;
+      positions[i * 3 + 1] += velocities[i].y;
+      positions[i * 3 + 2] += velocities[i].z;
+      
+      // Wraparound - если частица уходит далеко, возвращаем её
+      if (Math.abs(positions[i * 3]) > 20) positions[i * 3] *= -0.9;
+      if (positions[i * 3 + 1] > 15 || positions[i * 3 + 1] < -5) velocities[i].y *= -1;
+      if (Math.abs(positions[i * 3 + 2]) > 20) positions[i * 3 + 2] *= -0.9;
+    }
+    
+    dustParticles.geometry.attributes.position.needsUpdate = true;
+  }
+  
+  // Subtle camera drift - лёгкое покачивание
+  cameraDrift.offset.x = Math.sin(elapsed * 0.15) * 0.03;
+  cameraDrift.offset.y = Math.cos(elapsed * 0.12) * 0.02;
+  controls.target.copy(cameraDrift.baseTarget).add(cameraDrift.offset);
 
   // Получаем направление камеры для ориентации колец
   const cameraDirection = new THREE.Vector3();

@@ -76,6 +76,44 @@
               drop-shadow(0 0 40px rgba(180, 200, 255, 0.35));
     }
 
+    .nav-link .line1,
+    .nav-link .line2 {
+      display: inline;
+    }
+
+    /* Мобильная адаптация навигации */
+    @media (max-width: 600px) {
+      #top-nav {
+        padding: 0 20px;
+        height: 70px;
+      }
+
+      .nav-link {
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      .nav-link .line1 {
+        display: block;
+      }
+
+      .nav-link .line2 {
+        display: block;
+      }
+
+      #nav-project-list {
+        text-align: left;
+      }
+
+      #nav-download {
+        text-align: right;
+      }
+
+      #nav-logo {
+        height: 28px;
+      }
+    }
+
     /* Модальное окно — premium glass */
     #modal-overlay {
       display: none;
@@ -150,9 +188,9 @@
 <body>
   <!-- Навигация сверху -->
   <nav id="top-nav">
-    <a href="#" class="nav-link" id="nav-project-list">Project List View</a>
+    <a href="#" class="nav-link" id="nav-project-list"><span class="line1">Project</span> <span class="line2">list view</span></a>
     <img src="/Logo_lab_web.svg" alt="LAB" id="nav-logo">
-    <a href="#" class="nav-link" id="nav-download">Download .pdf</a>
+    <a href="#" class="nav-link" id="nav-download"><span class="line1">Download</span> <span class="line2">.pdf</span></a>
   </nav>
 
   <!-- Виньетка поверх сцены -->
