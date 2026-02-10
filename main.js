@@ -54,7 +54,7 @@ const FilmGrainShader = {
   uniforms: {
     tDiffuse: { value: null },
     uTime: { value: 0 },
-    uIntensity: { value: 0.08 },
+    uIntensity: { value: 0.06 },
   },
   vertexShader: `
     varying vec2 vUv;
@@ -79,9 +79,12 @@ const FilmGrainShader = {
       // Анимированный шум
       float grain = random(vUv * 1000.0 + uTime * 100.0) - 0.5;
       
-      // Применяем шум только к тёмным/средним областям, сферы остаются чистыми
+      // Применяем шум ТОЛЬКО к тёмным областям (космос, планета)
+      // Сферы, текст, солнце - исключаются
       float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-      float grainMask = smoothstep(0.8, 0.3, luminance);
+      
+      // Более агрессивная маска - grain только на очень тёмных областях
+      float grainMask = smoothstep(0.15, 0.02, luminance);
       
       color.rgb += grain * uIntensity * grainMask;
       
@@ -91,6 +94,12 @@ const FilmGrainShader = {
 };
 
 const grainPass = new ShaderPass(FilmGrainShader);
+
+// Уменьшаем grain на мобильных
+if (window.innerWidth < 768) {
+  grainPass.uniforms.uIntensity.value = 0.03;
+}
+
 composer.addPass(grainPass);
 
 composer.addPass(new OutputPass());
@@ -219,10 +228,10 @@ function createLensFlares() {
   
   const lensflare = new Lensflare();
   
-  // Основное свечение
+  // Основное свечение (уменьшено для круглой формы)
   const mainColor = new THREE.Color(1, 0.95, 0.8);
-  const flareMain = createCircleFlare(256, mainColor, 0.6);
-  lensflare.addElement(new LensflareElement(flareMain, 150, 0, mainColor));
+  const flareMain = createCircleFlare(256, mainColor, 0.4);
+  lensflare.addElement(new LensflareElement(flareMain, 80, 0, mainColor));
   
   // Анаморфные горизонтальные блики (характерные для кино)
   const anamorphicColor = new THREE.Color(0.8, 0.9, 1.0);
@@ -827,6 +836,9 @@ window.addEventListener('resize', () => {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   composer.setSize(w, h);
   bloomPass.resolution.set(w, h);
+  
+  // Уменьшаем grain на мобильных
+  grainPass.uniforms.uIntensity.value = w < 768 ? 0.03 : 0.06;
 });
 
 // ==========================================
