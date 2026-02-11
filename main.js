@@ -35,19 +35,86 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
 // ==========================================
-// 2. Post-processing — Bloom
+// 2. Post-processing — Selective Bloom
 // ==========================================
 
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
+// Слой для объектов с bloom (сферы, кольца, солнце)
+const BLOOM_LAYER = 1;
+const bloomLayer = new THREE.Layers();
+bloomLayer.set(BLOOM_LAYER);
+
+// Материалы для временного затемнения non-bloom объектов
+const darkMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+const materials = {};
+
+function darkenNonBloomed(obj) {
+  if (obj.isMesh || obj.isSprite) {
+    if (!bloomLayer.test(obj.layers)) {
+      materials[obj.uuid] = obj.material;
+      obj.material = darkMaterial;
+    }
+  }
+}
+
+function restoreMaterial(obj) {
+  if (materials[obj.uuid]) {
+    obj.material = materials[obj.uuid];
+    delete materials[obj.uuid];
+  }
+}
+
+// Render target для bloom pass
+const renderTarget = new THREE.WebGLRenderTarget(
+  window.innerWidth,
+  window.innerHeight,
+  { type: THREE.HalfFloatType }
+);
+
+// Bloom composer (только для bloom объектов)
+const bloomComposer = new EffectComposer(renderer, renderTarget);
+bloomComposer.renderToScreen = false;
+bloomComposer.addPass(new RenderPass(scene, camera));
 
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.8,   // strength
-  0.4,   // radius
-  0.2    // threshold
+  1.2,   // strength
+  0.6,   // radius
+  0.1    // threshold
 );
-composer.addPass(bloomPass);
+bloomComposer.addPass(bloomPass);
+
+// Шейдер для комбинирования bloom с основной сценой
+const BloomMixShader = {
+  uniforms: {
+    baseTexture: { value: null },
+    bloomTexture: { value: null },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D baseTexture;
+    uniform sampler2D bloomTexture;
+    varying vec2 vUv;
+    void main() {
+      vec4 base = texture2D(baseTexture, vUv);
+      vec4 bloom = texture2D(bloomTexture, vUv);
+      gl_FragColor = base + bloom;
+    }
+  `
+};
+
+// Финальный composer
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+
+const mixPass = new ShaderPass(BloomMixShader, 'baseTexture');
+mixPass.uniforms.bloomTexture.value = bloomComposer.renderTarget2.texture;
+composer.addPass(mixPass);
 
 // Film Grain шейдер
 const FilmGrainShader = {
@@ -177,6 +244,7 @@ function createSunSprite() {
 }
 
 const sunSprite = createSunSprite();
+sunSprite.layers.enable(BLOOM_LAYER);
 scene.add(sunSprite);
 
 // Анаморфные lens flares от солнца
@@ -257,6 +325,7 @@ function createLensFlares() {
 }
 
 const lensFlares = createLensFlares();
+lensFlares.layers.enable(BLOOM_LAYER);
 scene.add(lensFlares);
 
 // ==========================================
@@ -334,6 +403,7 @@ function createTwinklingStarLayer(count, minR, maxR, size, color, opacity) {
   });
   
   const points = new THREE.Points(geometry, material);
+  points.layers.enable(BLOOM_LAYER);
   starLayers.push(points);
   return points;
 }
@@ -384,6 +454,7 @@ function createDustParticles(count) {
 }
 
 const dustParticles = createDustParticles(200);
+dustParticles.layers.enable(BLOOM_LAYER);
 scene.add(dustParticles);
 
 // ==========================================
@@ -523,6 +594,7 @@ function createEarthWithAtmosphere() {
   
   const earth = new THREE.Mesh(earthGeometry, earthMaterial);
   earth.position.set(0, -earthRadius - 35, 0);
+  earth.layers.enable(BLOOM_LAYER);
   earthGroup.add(earth);
   
   return { group: earthGroup, earthMaterial, earth };
@@ -641,6 +713,15 @@ const videoTextures = projectsData.map(p => createVideoTexture(p.video));
 // 8. Billboard-текст (Sprite — всегда к камере)
 // ==========================================
 
+// Настройки свечения текста (можно регулировать)
+const TEXT_GLOW_SETTINGS = {
+  enabled: true,
+  blur: 20,           // Радиус размытия (0-30)
+  color: 'rgba(255, 255, 255, 0.5)', // Цвет свечения
+  offsetX: 0,
+  offsetY: 0,
+};
+
 function createTextSprite(line1, line2, projectType = 'TV / DOOH') {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
@@ -658,21 +739,29 @@ function createTextSprite(line1, line2, projectType = 'TV / DOOH') {
   ctx.fillStyle = 'rgba(180, 200, 220, 0.7)';
   ctx.fillText(projectType, 490, 20);
 
+  // Настройка свечения для основного текста
+  if (TEXT_GLOW_SETTINGS.enabled) {
+    ctx.shadowColor = TEXT_GLOW_SETTINGS.color;
+    ctx.shadowBlur = TEXT_GLOW_SETTINGS.blur;
+    ctx.shadowOffsetX = TEXT_GLOW_SETTINGS.offsetX;
+    ctx.shadowOffsetY = TEXT_GLOW_SETTINGS.offsetY;
+  }
+
   // Линия 1 — крупный жирный
   ctx.font = '700 64px "Inter", "SF Pro Display", "Segoe UI", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
   ctx.fillStyle = '#ffffff';
   ctx.fillText(line1, 256, 90);
 
   // Линия 2 — тонкий, tracking
   ctx.font = '300 40px "Inter", "SF Pro Display", "Segoe UI", Arial, sans-serif';
+  ctx.fillStyle = 'rgba(220, 230, 240, 0.85)';
+  ctx.fillText(line2, 256, 165);
+
+  // Сброс свечения
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
-  ctx.fillStyle = 'rgba(220, 230, 240, 0.75)';
-  ctx.fillText(line2, 256, 165);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.minFilter = THREE.LinearFilter;
@@ -765,12 +854,14 @@ projects.forEach((project, i) => {
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.userData = project;
+  mesh.layers.enable(BLOOM_LAYER);
   group.add(mesh);
 
   // Единственное кольцо (фронтальное, меньшее, ближе к сфере)
   const ring = createGlowRing(SPHERE_RADIUS, 0x8899bb, 1.08, 1.12, 0.03);
   ring.userData.defaultColor = new THREE.Color(0x8899bb);
   ring.userData.hoverColor = new THREE.Color(0xB8FF00);
+  ring.layers.enable(BLOOM_LAYER);
   // Кольцо будет ориентироваться в animate()
   group.add(ring);
 
@@ -938,6 +1029,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(w, h);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   composer.setSize(w, h);
+  bloomComposer.setSize(w, h);
   bloomPass.resolution.set(w, h);
   
   // Обновляем grain для мобильных
@@ -1033,6 +1125,12 @@ function animate() {
 
   controls.update();
   checkHover();
+  
+  // Selective bloom: рендерим bloom только для объектов на BLOOM_LAYER
+  scene.traverse(darkenNonBloomed);
+  bloomComposer.render();
+  scene.traverse(restoreMaterial);
+  
   composer.render();
 }
 
