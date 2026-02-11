@@ -653,8 +653,8 @@ function createTextSprite(line1, line2, projectType = 'TV / DOOH') {
   ctx.font = '300 24px "Inter", "SF Pro Display", "Segoe UI", Arial, sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
-  ctx.shadowColor = 'rgba(100, 140, 180, 0.3)';
-  ctx.shadowBlur = 8;
+  ctx.shadowColor = 'rgba(100, 140, 180, 0.1)';
+  ctx.shadowBlur = 3;
   ctx.fillStyle = 'rgba(180, 200, 220, 0.7)';
   ctx.fillText(projectType, 490, 20);
 
@@ -662,15 +662,15 @@ function createTextSprite(line1, line2, projectType = 'TV / DOOH') {
   ctx.font = '700 64px "Inter", "SF Pro Display", "Segoe UI", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(100, 140, 180, 0.6)';
-  ctx.shadowBlur = 15;
+  ctx.shadowColor = 'rgba(100, 140, 180, 0.2)';
+  ctx.shadowBlur = 4;
   ctx.fillStyle = '#ffffff';
   ctx.fillText(line1, 256, 90);
 
   // Линия 2 — тонкий, tracking
   ctx.font = '300 40px "Inter", "SF Pro Display", "Segoe UI", Arial, sans-serif';
-  ctx.shadowColor = 'rgba(100, 140, 180, 0.3)';
-  ctx.shadowBlur = 10;
+  ctx.shadowColor = 'rgba(100, 140, 180, 0.1)';
+  ctx.shadowBlur = 3;
   ctx.fillStyle = 'rgba(220, 230, 240, 0.75)';
   ctx.fillText(line2, 256, 165);
 
@@ -681,7 +681,7 @@ function createTextSprite(line1, line2, projectType = 'TV / DOOH') {
   const material = new THREE.SpriteMaterial({
     map: texture,
     transparent: true,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
     depthWrite: false,
     depthTest: true,
   });
@@ -754,7 +754,7 @@ projects.forEach((project, i) => {
     map: projectVideoTexture,
     emissiveMap: projectVideoTexture,
     emissive: new THREE.Color(0xffffff),
-    emissiveIntensity: 0.6,
+    emissiveIntensity: 0.35,
     roughness: 0.25,
     metalness: 0.0,
     clearcoat: 0.5,
@@ -768,7 +768,7 @@ projects.forEach((project, i) => {
   group.add(mesh);
 
   // Единственное кольцо (фронтальное, меньшее, ближе к сфере)
-  const ring = createGlowRing(SPHERE_RADIUS, 0x8899bb, 1.08, 1.12, 0.15);
+  const ring = createGlowRing(SPHERE_RADIUS, 0x8899bb, 1.08, 1.12, 0.08);
   ring.userData.defaultColor = new THREE.Color(0x8899bb);
   ring.userData.hoverColor = new THREE.Color(0xB8FF00);
   // Кольцо будет ориентироваться в animate()
