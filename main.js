@@ -658,6 +658,96 @@ const projectsData = [
       type: 'video',
       mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/LAB_Tbank_NewYear.MP4'
     }
+  },
+  {
+    video: '/videos/Artlist_BigGame_LAB_WEB.mp4',
+    client: 'Artlist',
+    subtitle: 'Big Game',
+    type: 'CONTEST',
+    content: {
+      type: 'video',
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/LAB_Artlist_Biggame_contest.MP4'
+    }
+  },
+  {
+    video: '/videos/Cola_LAB_WEB.mp4',
+    client: 'Coca-Cola',
+    subtitle: 'Halloween',
+    type: 'SOCIALS',
+    content: {
+      type: 'video',
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/Lab_CocaCola_Halloween.mp4'
+    }
+  },
+  {
+    video: '/videos/Cupra_LAB_WEB.mp4',
+    client: 'Cupra',
+    subtitle: 'Raval',
+    type: 'OLV',
+    content: {
+      type: 'video',
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/LAB_Cupra_Raval_2026.mp4'
+    }
+  },
+  {
+    video: '/videos/OTP_Alpaka_LAB_WEB.mp4',
+    client: 'OTP Bank',
+    subtitle: 'Soft Payments 1/2',
+    type: 'TV, OLV, DOOH',
+    content: {
+      type: 'video',
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/LAB_OTP_Alpaka.MP4'
+    }
+  },
+  {
+    video: '/videos/OTP_Husky_LAB_WEB.mp4',
+    client: 'OTP Bank',
+    subtitle: 'Soft Payments 2/2',
+    type: 'TV, OLV, DOOH',
+    content: {
+      type: 'video',
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/LAB_OTP_HUSKY.MP4'
+    }
+  },
+  {
+    video: '/videos/Profi_LAB_WEB.mp4',
+    client: 'Profi',
+    subtitle: 'Heroes',
+    type: 'DOOH, OLV',
+    content: {
+      type: 'video',
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/Lab_ProfiHeroes.mp4'
+    }
+  },
+  {
+    video: '/videos/SMLT_NY_LAB_WEB.mp4',
+    client: 'Samolet',
+    subtitle: 'Pre-New Year',
+    type: 'TV, OLV, DOOH',
+    content: {
+      type: 'video',
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/Lab_Samolet_NY.mp4'
+    }
+  },
+  {
+    video: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/Lab_Starbucks_Halloween.mp4',
+    client: 'Starbucks',
+    subtitle: 'Halloween',
+    type: 'SOCIALS',
+    content: {
+      type: 'video',
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/Lab_Starbucks_Halloween.mp4'
+    }
+  },
+  {
+    video: '/videos/Tbank_b2s_LAB_WEB.mp4',
+    client: 'T-Bank',
+    subtitle: 'Back2School',
+    type: 'OLV',
+    content: {
+      type: 'video',
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/LAB_Tbank.mp4'
+    }
   }
 ];
 
@@ -801,7 +891,7 @@ function createGlowRing(radius, color, innerMult, outerMult, opacity) {
 // 10. Генерация 5 сфер проектов
 // ==========================================
 
-const SPHERE_COUNT = 5;
+const SPHERE_COUNT = 14;
 const SPHERE_RADIUS = 1.2;
 const ORBIT_DISTANCE = 12;
 
@@ -821,11 +911,22 @@ projects.forEach((project, i) => {
 
   // Хаотичное распределение в верхней полусфере (текст не залезает на Землю)
   const presetPositions = [
-    { theta: 0.4, y: 0.75, r: 1.0 },
-    { theta: 2.3, y: 0.45, r: 0.95 },
-    { theta: 4.5, y: 0.85, r: 0.88 },
-    { theta: 1.5, y: 0.55, r: 1.08 },
-    { theta: 5.3, y: 0.3, r: 0.92 },
+    // Оригинальные 5
+    { theta: 0.4,  y: 0.75, r: 1.0  },
+    { theta: 2.3,  y: 0.45, r: 0.95 },
+    { theta: 4.5,  y: 0.85, r: 0.88 },
+    { theta: 1.5,  y: 0.55, r: 1.08 },
+    { theta: 5.3,  y: 0.30, r: 0.92 },
+    // Новые 9
+    { theta: 3.4,  y: 0.65, r: 1.04 },
+    { theta: 0.9,  y: 0.35, r: 0.98 },
+    { theta: 5.8,  y: 0.70, r: 0.90 },
+    { theta: 2.8,  y: 0.80, r: 1.02 },
+    { theta: 4.0,  y: 0.40, r: 0.94 },
+    { theta: 1.0,  y: 0.60, r: 1.06 },
+    { theta: 3.8,  y: 0.25, r: 0.96 },
+    { theta: 5.0,  y: 0.55, r: 1.00 },
+    { theta: 1.8,  y: 0.90, r: 0.86 },
   ];
   const preset = presetPositions[i];
   
