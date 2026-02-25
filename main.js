@@ -616,7 +616,7 @@ const projectsData = [
     type: 'DOOH',
     content: {
       type: 'video',
-      vimeoId: '1163618338'
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/LAB_Delimobil_DOOH.MP4'
     }
   },
   {
@@ -626,7 +626,7 @@ const projectsData = [
     type: 'TV, OLV',
     content: {
       type: 'video',
-      vimeoId: '1163618380'
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/LAB_Fonbet_KHL.MP4'
     }
   },
   {
@@ -636,7 +636,7 @@ const projectsData = [
     type: 'OLV',
     content: {
       type: 'video',
-      vimeoId: '1163618518'
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/LAB_OAKLEY.mp4'
     }
   },
   {
@@ -646,7 +646,7 @@ const projectsData = [
     type: 'TV, OLV, DOOH',
     content: {
       type: 'video',
-      vimeoId: '1163618584'
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/Lab_Samolet_Neigh360.mp4'
     }
   },
   {
@@ -656,7 +656,7 @@ const projectsData = [
     type: 'OLV, DOOH',
     content: {
       type: 'video',
-      vimeoId: '1163618628'
+      mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/LAB_Tbank_NewYear.MP4'
     }
   }
 ];
@@ -970,15 +970,20 @@ function showModal(project) {
   const { client, subtitle, type, content } = project;
   
   let mediaHtml = '';
-  if (content && content.type === 'video' && content.vimeoId) {
+  if (content && content.type === 'video' && content.mp4Url) {
     mediaHtml = `
       <div class="modal-video-container">
-        <iframe 
-          src="https://player.vimeo.com/video/${content.vimeoId}?autoplay=1&loop=1&title=0&byline=0&portrait=0&dnt=1"
-          frameborder="0" 
-          allow="autoplay; fullscreen; picture-in-picture" 
-          allowfullscreen>
-        </iframe>
+        <video 
+          src="${content.mp4Url}"
+          autoplay 
+          loop 
+          controls 
+          controlsList="nodownload"
+          disablePictureInPicture
+          oncontextmenu="return false;"
+          playsinline
+          style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;background:#000;">
+        </video>
       </div>
     `;
   }
