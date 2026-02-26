@@ -832,23 +832,46 @@ function createVideoTexture(videoSrc) {
 }
 
 // ==========================================
-// 7b. Lazy Video System (мобилка)
+// 7b. Frustum-based Lazy Video with Blob Preload
 // ==========================================
-// На мобилке одновременно активны только MAX_ACTIVE_VIDEOS ближайших к камере видео.
-// Остальные показывают статичный постер-кадр. Видео загружаются/выгружаются динамически.
+// 1. При загрузке страницы все видео скачиваются в blob-кеш (фоново, без декодеров)
+// 2. Когда сфера попадает в видимость — создаём <video> из blob → старт ~200ms
+// 3. При уходе из видимости — видео уничтожается, blob остаётся в кеше
 
-// ==========================================
-// 7b. Frustum-based Lazy Video System
-// ==========================================
-// Видео загружаются/воспроизводятся только для сфер, которые видны на экране
-// (или почти видны — с запасом). Невидимые сферы показывают статичный кадр.
-// При повороте камеры видео плавно включаются и выключаются.
+const FRUSTUM_MARGIN = 0.35;
 
-const FRUSTUM_MARGIN = 0.35; // Запас за пределами экрана (0.35 = ~35% ширины экрана)
+// Глобальный blob-кеш для видеоданных
+const videoBlobCache = new Map();
 
-// Создаёт «ленивую» видео-текстуру: начинает с placeholder, видео по запросу
+// Фоновая предзагрузка всех видео в blob
+function preloadVideoBlobs(urls) {
+  urls.forEach(url => {
+    if (!url || videoBlobCache.has(url)) return;
+    // Ставим null как маркер «загружается»
+    videoBlobCache.set(url, null);
+    fetch(url)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        videoBlobCache.set(url, blobUrl);
+      })
+      .catch(() => {
+        // Не удалось — при активации загрузим напрямую
+        videoBlobCache.delete(url);
+      });
+  });
+}
+
+// Собираем все URL видео и начинаем предзагрузку
+const allVideoUrls = projectsData.filter(p => p.video).map(p => p.video);
+preloadVideoBlobs(allVideoUrls);
+
+// Создаёт «ленивую» видео-текстуру с blob-кешем
 function createLazyVideoTexture(videoSrc) {
-  // Placeholder canvas (тёмный фон пока видео не активно)
+  // Placeholder canvas
   const placeholderCanvas = document.createElement('canvas');
   placeholderCanvas.width = 128;
   placeholderCanvas.height = 128;
@@ -889,10 +912,15 @@ function createLazyVideoTexture(videoSrc) {
       vid.preload = 'auto';
       vid.setAttribute('playsinline', '');
       vid.setAttribute('webkit-playsinline', '');
-      vid.src = this.videoSrc;
+
+      // Используем blob из кеша если доступен, иначе грузим напрямую
+      const cachedBlob = videoBlobCache.get(this.videoSrc);
+      vid.src = cachedBlob || this.videoSrc;
 
       const self = this;
       function tryPlay() {
+        // Проверяем что всё ещё активен (мог деактивироваться пока видео грузилось)
+        if (!self.active) return;
         const p = vid.play();
         if (p !== undefined) {
           p.catch(() => {
