@@ -9,6 +9,11 @@ import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
 import { gsap } from 'gsap';
 
 // ==========================================
+// 0. Mobile detection (early, used everywhere)
+// ==========================================
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+// ==========================================
 // 1. Сцена, камера, рендерер (Premium CG)
 // ==========================================
 
@@ -24,11 +29,11 @@ const camera = new THREE.PerspectiveCamera(
 camera.position.set(0, 0, 0.001);
 
 const renderer = new THREE.WebGLRenderer({
-  antialias: true,
-  powerPreference: 'high-performance',
+  antialias: !isMobile,
+  powerPreference: isMobile ? 'default' : 'high-performance',
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -64,10 +69,12 @@ function restoreMaterial(obj) {
 }
 
 // Render target для bloom pass
+const bloomRTWidth = isMobile ? Math.floor(window.innerWidth / 2) : window.innerWidth;
+const bloomRTHeight = isMobile ? Math.floor(window.innerHeight / 2) : window.innerHeight;
 const renderTarget = new THREE.WebGLRenderTarget(
-  window.innerWidth,
-  window.innerHeight,
-  { type: THREE.HalfFloatType }
+  bloomRTWidth,
+  bloomRTHeight,
+  { type: isMobile ? THREE.UnsignedByteType : THREE.HalfFloatType }
 );
 
 // Bloom composer (только для bloom объектов)
@@ -76,10 +83,10 @@ bloomComposer.renderToScreen = false;
 bloomComposer.addPass(new RenderPass(scene, camera));
 
 const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.2,   // strength
-  0.6,   // radius
-  0.1    // threshold
+  new THREE.Vector2(bloomRTWidth, bloomRTHeight),
+  isMobile ? 0.8 : 1.2,   // strength
+  isMobile ? 0.3 : 0.6,   // radius
+  isMobile ? 0.3 : 0.1    // threshold
 );
 bloomComposer.addPass(bloomPass);
 
@@ -165,14 +172,13 @@ const FilmGrainShader = {
   `
 };
 
-const grainPass = new ShaderPass(FilmGrainShader);
-
-// Уменьшаем grain на мобильных
-if (window.innerWidth < 768) {
-  grainPass.uniforms.uIntensity.value = 0.018;
+// На мобильных полностью пропускаем grain pass для экономии GPU
+if (!isMobile) {
+  const grainPass = new ShaderPass(FilmGrainShader);
+  composer.addPass(grainPass);
+  // Сохраняем ссылку для обновления в animate
+  window.__grainPass = grainPass;
 }
-
-composer.addPass(grainPass);
 
 composer.addPass(new OutputPass());
 
@@ -324,9 +330,12 @@ function createLensFlares() {
   return lensflare;
 }
 
-const lensFlares = createLensFlares();
-lensFlares.layers.enable(BLOOM_LAYER);
-scene.add(lensFlares);
+// Lens flares тяжёлые — пропускаем на мобилке
+if (!isMobile) {
+  const lensFlares = createLensFlares();
+  lensFlares.layers.enable(BLOOM_LAYER);
+  scene.add(lensFlares);
+}
 
 // ==========================================
 // 5. Звёздное поле (многослойное с мерцанием)
@@ -409,9 +418,14 @@ function createTwinklingStarLayer(count, minR, maxR, size, color, opacity) {
 }
 
 // Более премиальные звёзды - меньше и тоньше, с мерцанием
-scene.add(createTwinklingStarLayer(400, 80, 200, 0.4, 0xffffff, 0.9));
-scene.add(createTwinklingStarLayer(800, 60, 220, 0.2, 0xddeeff, 0.5));
-scene.add(createTwinklingStarLayer(1500, 50, 250, 0.1, 0xaabbdd, 0.25));
+if (isMobile) {
+  scene.add(createTwinklingStarLayer(200, 80, 200, 0.4, 0xffffff, 0.9));
+  scene.add(createTwinklingStarLayer(300, 60, 220, 0.2, 0xddeeff, 0.5));
+} else {
+  scene.add(createTwinklingStarLayer(400, 80, 200, 0.4, 0xffffff, 0.9));
+  scene.add(createTwinklingStarLayer(800, 60, 220, 0.2, 0xddeeff, 0.5));
+  scene.add(createTwinklingStarLayer(1500, 50, 250, 0.1, 0xaabbdd, 0.25));
+}
 
 // ==========================================
 // 5.5 Пылевые частицы (Dust Particles)
@@ -453,7 +467,7 @@ function createDustParticles(count) {
   return points;
 }
 
-const dustParticles = createDustParticles(200);
+const dustParticles = createDustParticles(isMobile ? 50 : 200);
 dustParticles.layers.enable(BLOOM_LAYER);
 scene.add(dustParticles);
 
@@ -466,7 +480,8 @@ function createEarthWithAtmosphere() {
   
   // Большая сфера Земли (видимая сверху)
   const earthRadius = 180;
-  const earthGeometry = new THREE.SphereGeometry(earthRadius, 128, 128);
+  const earthSegs = isMobile ? 48 : 128;
+  const earthGeometry = new THREE.SphereGeometry(earthRadius, earthSegs, earthSegs);
   
   // Шейдерный материал для тёмной Земли с огнями городов
   const earthMaterial = new THREE.ShaderMaterial({
@@ -840,12 +855,54 @@ function createImageTexture(imageSrc) {
   return { video: null, texture, type: 'image', loaded: loader };
 }
 
+// На мобилке создаём лёгкую canvas-текстуру вместо видео
+// Это полностью исключает загрузку 14 видеофайлов (~18MB) на мобилке
+function createMobilePlaceholderTexture(client) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  
+  // Тёмный градиент фон
+  const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  gradient.addColorStop(0, '#1a1a2e');
+  gradient.addColorStop(1, '#0a0a12');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 256, 256);
+  
+  // Названиеклиента
+  ctx.font = 'bold 28px Inter, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.fillText(client, 128, 128);
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = false;
+  texture.center.set(0.5, 0.5);
+  texture.offset.set(0.25, 0);
+  
+  return { video: null, texture, type: 'image' };
+}
+
 // Создаём текстуры для всех проектов (видео или картинка)
-const projectTextures = projectsData.map(p => {
-  if (p.video) return createVideoTexture(p.video);
-  if (p.image) return createImageTexture(p.image);
-  return createVideoTexture(''); // fallback
-});
+// На мобилке — только лёгкие canvas-текстуры, на десктопе — видео
+let projectTextures;
+if (isMobile) {
+  projectTextures = projectsData.map(p => {
+    if (p.image) return createImageTexture(p.image);
+    return createMobilePlaceholderTexture(p.client);
+  });
+} else {
+  projectTextures = projectsData.map(p => {
+    if (p.video) return createVideoTexture(p.video);
+    if (p.image) return createImageTexture(p.image);
+    return createVideoTexture(''); // fallback
+  });
+}
 
 // ==========================================
 // 8. Billboard-текст (Sprite — всегда к камере)
@@ -940,7 +997,7 @@ function createGlowRing(radius, color, innerMult, outerMult, opacity) {
 // ==========================================
 
 const SPHERE_COUNT = 16;
-const isMobile = window.innerWidth < 768;
+// isMobile already defined at top of file
 const SPHERE_RADIUS = isMobile ? 0.9 : 1.2;
 const ORBIT_DISTANCE = isMobile ? 15 : 12;
 const MIN_SPHERE_DISTANCE = isMobile ? 5.5 : 5.0; // Минимальная дистанция между центрами сфер
@@ -1024,21 +1081,36 @@ projects.forEach((project, i) => {
   const pos = spherePositions[i];
   group.position.set(pos.x, pos.y, pos.z);
 
-  // Сфера — текстура (видео или картинка) с лёгким glass-эффектом
-  const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 64);
+  // Сфера — текстура (видео или картинка)
+  // На мобилке используем лёгкий MeshStandardMaterial вместо тяжёлого MeshPhysicalMaterial
+  const sphereSegs = isMobile ? 32 : 64;
+  const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, sphereSegs, sphereSegs);
   const projectTexture = projectTextures[i].texture;
-  const material = new THREE.MeshPhysicalMaterial({
-    map: projectTexture,
-    emissiveMap: projectTexture,
-    emissive: new THREE.Color(0xffffff),
-    emissiveIntensity: 0.15,
-    roughness: 0.25,
-    metalness: 0.0,
-    clearcoat: 0.5,
-    clearcoatRoughness: 0.1,
-    reflectivity: 0.3,
-    envMapIntensity: 0.5,
-  });
+
+  let material;
+  if (isMobile) {
+    material = new THREE.MeshStandardMaterial({
+      map: projectTexture,
+      emissiveMap: projectTexture,
+      emissive: new THREE.Color(0xffffff),
+      emissiveIntensity: 0.2,
+      roughness: 0.4,
+      metalness: 0.0,
+    });
+  } else {
+    material = new THREE.MeshPhysicalMaterial({
+      map: projectTexture,
+      emissiveMap: projectTexture,
+      emissive: new THREE.Color(0xffffff),
+      emissiveIntensity: 0.15,
+      roughness: 0.25,
+      metalness: 0.0,
+      clearcoat: 0.5,
+      clearcoatRoughness: 0.1,
+      reflectivity: 0.3,
+      envMapIntensity: 0.5,
+    });
+  }
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.userData = project;
@@ -1259,14 +1331,16 @@ window.addEventListener('resize', () => {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 2));
   composer.setSize(w, h);
   bloomComposer.setSize(w, h);
   bloomPass.resolution.set(w, h);
   
-  // Обновляем grain для мобильных
-  grainPass.uniforms.uIntensity.value = w < 768 ? 0.018 : 0.04;
-  grainPass.uniforms.uResolution.value.set(w, h);
+  // Обновляем grain для десктопа
+  if (window.__grainPass) {
+    window.__grainPass.uniforms.uIntensity.value = 0.04;
+    window.__grainPass.uniforms.uResolution.value.set(w, h);
+  }
 });
 
 // ==========================================
@@ -1287,8 +1361,8 @@ function animate() {
   const elapsed = clock.getElapsedTime();
 
   // Film Grain обновление времени
-  if (grainPass.uniforms.uTime) {
-    grainPass.uniforms.uTime.value = elapsed;
+  if (window.__grainPass && window.__grainPass.uniforms.uTime) {
+    window.__grainPass.uniforms.uTime.value = elapsed;
   }
   
   // Обновляем мерцание звёзд
@@ -1358,12 +1432,18 @@ function animate() {
   controls.update();
   checkHover();
   
-  // Selective bloom: рендерим bloom только для объектов на BLOOM_LAYER
-  scene.traverse(darkenNonBloomed);
-  bloomComposer.render();
-  scene.traverse(restoreMaterial);
-  
-  composer.render();
+  if (isMobile) {
+    // На мобилке — простой рендер через composer без selective bloom
+    // (один проход вместо двух, экономит ~50% GPU)
+    composer.render();
+  } else {
+    // Selective bloom: рендерим bloom только для объектов на BLOOM_LAYER
+    scene.traverse(darkenNonBloomed);
+    bloomComposer.render();
+    scene.traverse(restoreMaterial);
+    
+    composer.render();
+  }
 }
 
 // ==========================================
