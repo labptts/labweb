@@ -1028,7 +1028,7 @@ function createTextSprite(line1, line2, projectType = 'TV / DOOH') {
   });
 
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(isMobile ? 2.8 : 3.5, isMobile ? 1.4 : 1.75, 1);
+  sprite.scale.set(isMobile ? 3.4 : 3.5, isMobile ? 1.7 : 1.75, 1);
   return sprite;
 }
 
@@ -1055,7 +1055,7 @@ function createGlowRing(radius, color, innerMult, outerMult, opacity) {
 
 const SPHERE_COUNT = 16;
 // isMobile already defined at top of file
-const SPHERE_RADIUS = isMobile ? 0.9 : 1.2;
+const SPHERE_RADIUS = isMobile ? 1.15 : 1.2;
 const ORBIT_DISTANCE = isMobile ? 15 : 12;
 const MIN_SPHERE_DISTANCE = isMobile ? 5.5 : 5.0; // Минимальная дистанция между центрами сфер
 
