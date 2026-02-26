@@ -330,12 +330,9 @@ function createLensFlares() {
   return lensflare;
 }
 
-// Lens flares тяжёлые — пропускаем на мобилке
-if (!isMobile) {
-  const lensFlares = createLensFlares();
-  lensFlares.layers.enable(BLOOM_LAYER);
-  scene.add(lensFlares);
-}
+const lensFlares = createLensFlares();
+lensFlares.layers.enable(BLOOM_LAYER);
+scene.add(lensFlares);
 
 // ==========================================
 // 5. Звёздное поле (многослойное с мерцанием)
@@ -855,54 +852,12 @@ function createImageTexture(imageSrc) {
   return { video: null, texture, type: 'image', loaded: loader };
 }
 
-// На мобилке создаём лёгкую canvas-текстуру вместо видео
-// Это полностью исключает загрузку 14 видеофайлов (~18MB) на мобилке
-function createMobilePlaceholderTexture(client) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  
-  // Тёмный градиент фон
-  const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-  gradient.addColorStop(0, '#1a1a2e');
-  gradient.addColorStop(1, '#0a0a12');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 256, 256);
-  
-  // Названиеклиента
-  ctx.font = 'bold 28px Inter, Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-  ctx.fillText(client, 128, 128);
-  
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.generateMipmaps = false;
-  texture.center.set(0.5, 0.5);
-  texture.offset.set(0.25, 0);
-  
-  return { video: null, texture, type: 'image' };
-}
-
 // Создаём текстуры для всех проектов (видео или картинка)
-// На мобилке — только лёгкие canvas-текстуры, на десктопе — видео
-let projectTextures;
-if (isMobile) {
-  projectTextures = projectsData.map(p => {
-    if (p.image) return createImageTexture(p.image);
-    return createMobilePlaceholderTexture(p.client);
-  });
-} else {
-  projectTextures = projectsData.map(p => {
-    if (p.video) return createVideoTexture(p.video);
-    if (p.image) return createImageTexture(p.image);
-    return createVideoTexture(''); // fallback
-  });
-}
+const projectTextures = projectsData.map(p => {
+  if (p.video) return createVideoTexture(p.video);
+  if (p.image) return createImageTexture(p.image);
+  return createVideoTexture(''); // fallback
+});
 
 // ==========================================
 // 8. Billboard-текст (Sprite — всегда к камере)
@@ -1081,36 +1036,22 @@ projects.forEach((project, i) => {
   const pos = spherePositions[i];
   group.position.set(pos.x, pos.y, pos.z);
 
-  // Сфера — текстура (видео или картинка)
-  // На мобилке используем лёгкий MeshStandardMaterial вместо тяжёлого MeshPhysicalMaterial
+  // Сфера — текстура (видео или картинка) с лёгким glass-эффектом
   const sphereSegs = isMobile ? 32 : 64;
   const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, sphereSegs, sphereSegs);
   const projectTexture = projectTextures[i].texture;
-
-  let material;
-  if (isMobile) {
-    material = new THREE.MeshStandardMaterial({
-      map: projectTexture,
-      emissiveMap: projectTexture,
-      emissive: new THREE.Color(0xffffff),
-      emissiveIntensity: 0.2,
-      roughness: 0.4,
-      metalness: 0.0,
-    });
-  } else {
-    material = new THREE.MeshPhysicalMaterial({
-      map: projectTexture,
-      emissiveMap: projectTexture,
-      emissive: new THREE.Color(0xffffff),
-      emissiveIntensity: 0.15,
-      roughness: 0.25,
-      metalness: 0.0,
-      clearcoat: 0.5,
-      clearcoatRoughness: 0.1,
-      reflectivity: 0.3,
-      envMapIntensity: 0.5,
-    });
-  }
+  const material = new THREE.MeshPhysicalMaterial({
+    map: projectTexture,
+    emissiveMap: projectTexture,
+    emissive: new THREE.Color(0xffffff),
+    emissiveIntensity: 0.15,
+    roughness: 0.25,
+    metalness: 0.0,
+    clearcoat: 0.5,
+    clearcoatRoughness: 0.1,
+    reflectivity: 0.3,
+    envMapIntensity: 0.5,
+  });
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.userData = project;
