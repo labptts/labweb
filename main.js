@@ -910,11 +910,11 @@ function createTextSprite(line1, line2, projectType = 'TV / DOOH') {
     transparent: true,
     blending: THREE.NormalBlending,
     depthWrite: false,
-    depthTest: true,
+    depthTest: false,
   });
 
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(3.5, 1.75, 1);
+  sprite.scale.set(isMobile ? 2.8 : 3.5, isMobile ? 1.4 : 1.75, 1);
   return sprite;
 }
 
@@ -940,9 +940,10 @@ function createGlowRing(radius, color, innerMult, outerMult, opacity) {
 // ==========================================
 
 const SPHERE_COUNT = 16;
-const SPHERE_RADIUS = 1.2;
-const ORBIT_DISTANCE = 12;
-const MIN_SPHERE_DISTANCE = 5.0; // Минимальная дистанция между центрами сфер
+const isMobile = window.innerWidth < 768;
+const SPHERE_RADIUS = isMobile ? 0.9 : 1.2;
+const ORBIT_DISTANCE = isMobile ? 15 : 12;
+const MIN_SPHERE_DISTANCE = isMobile ? 5.5 : 5.0; // Минимальная дистанция между центрами сфер
 
 const projects = projectsData.map((p, i) => ({
   name: `Project ${i + 1}`,
