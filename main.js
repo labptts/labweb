@@ -751,9 +751,9 @@ const projectsData = [
   },
   {
     image: '/NOWRUZ1.webp',
-    client: 'Nowruz',
-    subtitle: 'Holiday Campaign',
-    type: 'KEY VISUAL',
+    client: 'Yandex GO KZ',
+    subtitle: 'Nauriz',
+    type: 'DOOH, IN-APP',
     content: {
       type: 'gallery',
       images: [
@@ -767,9 +767,9 @@ const projectsData = [
   },
   {
     image: '/YandexDrive_Bags_1_1.webp',
-    client: 'Yandex Drive',
-    subtitle: 'Bags',
-    type: 'KEY VISUAL',
+    client: 'Yandex.Drive',
+    subtitle: 'Studio',
+    type: 'DOOH, IN-APP',
     content: {
       type: 'gallery',
       images: [
