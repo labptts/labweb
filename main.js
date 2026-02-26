@@ -1056,8 +1056,8 @@ function createGlowRing(radius, color, innerMult, outerMult, opacity) {
 const SPHERE_COUNT = 16;
 // isMobile already defined at top of file
 const SPHERE_RADIUS = isMobile ? 1.15 : 1.2;
-const ORBIT_DISTANCE = isMobile ? 15 : 12;
-const MIN_SPHERE_DISTANCE = isMobile ? 5.5 : 5.0; // Минимальная дистанция между центрами сфер
+const ORBIT_DISTANCE = 12;
+const MIN_SPHERE_DISTANCE = isMobile ? 4.5 : 5.0; // Минимальная дистанция между центрами сфер
 
 const projects = projectsData.map((p, i) => ({
   name: `Project ${i + 1}`,
@@ -1461,6 +1461,14 @@ function animate() {
       
       const labelOffset = cameraUp.clone().multiplyScalar(-(SPHERE_RADIUS + 1.5));
       label.position.copy(sphereWorldPos).add(labelOffset);
+      
+      // Компенсируем перспективное уменьшение: дальние лейблы масштабируем крупнее
+      if (isMobile) {
+        const dist = sphereWorldPos.distanceTo(camera.position);
+        const baseScale = 3.4;
+        const scaleFactor = Math.max(1.0, dist / 10); // нормализуем к ~10 единицам
+        label.scale.set(baseScale * scaleFactor, (baseScale / 2) * scaleFactor, 1);
+      }
     }
   });
   
