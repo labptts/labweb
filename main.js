@@ -610,7 +610,7 @@ scene.add(earthScene.group);
 // Данные проектов с реальными видео
 const projectsData = [
   {
-    video: '/videos/DelimobilDooh_LAB_WEB.mp4',
+    video: '/videos/DelimobilDooh_LAB_WEB.webm',
     client: 'Delimobil',
     subtitle: 'DOOH in Style',
     type: 'DOOH',
@@ -620,7 +620,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/FonbetKHL_LAB_WEB.mp4',
+    video: '/videos/FonbetKHL_LAB_WEB.webm',
     client: 'Fonbet KZ',
     subtitle: 'KHL moments',
     type: 'TV, OLV',
@@ -630,7 +630,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/OakleyPlantaris_LAB_WEB.mp4',
+    video: '/videos/OakleyPlantaris_LAB_WEB.webm',
     client: 'Oakley',
     subtitle: 'Plantaris launch',
     type: 'OLV',
@@ -640,7 +640,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/Samolet360_LAB_WEB.mp4',
+    video: '/videos/Samolet360_LAB_WEB.webm',
     client: 'Samolet',
     subtitle: 'Neighbourhood 360',
     type: 'TV, OLV, DOOH',
@@ -650,7 +650,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/TbankNY_LAB_WEB.mp4',
+    video: '/videos/TbankNY_LAB_WEB.webm',
     client: 'T-Bank',
     subtitle: 'New Year wish',
     type: 'OLV, DOOH',
@@ -660,7 +660,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/Artlist_BigGame_LAB_WEB.mp4',
+    video: '/videos/Artlist_BigGame_LAB_WEB.webm',
     client: 'Artlist',
     subtitle: 'Big Game',
     type: 'CONTEST',
@@ -670,7 +670,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/Cola_LAB_WEB.mp4',
+    video: '/videos/Cola_LAB_WEB.webm',
     client: 'Coca-Cola',
     subtitle: 'Halloween',
     type: 'SOCIALS',
@@ -680,7 +680,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/Cupra_LAB_WEB.mp4',
+    video: '/videos/Cupra_LAB_WEB.webm',
     client: 'Cupra',
     subtitle: 'Raval',
     type: 'OLV',
@@ -690,7 +690,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/OTP_Alpaka_LAB_WEB.mp4',
+    video: '/videos/OTP_Alpaka_LAB_WEB.webm',
     client: 'OTP Bank',
     subtitle: 'Soft Payments 1/2',
     type: 'TV, OLV, DOOH',
@@ -700,7 +700,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/OTP_Husky_LAB_WEB.mp4',
+    video: '/videos/OTP_Husky_LAB_WEB.webm',
     client: 'OTP Bank',
     subtitle: 'Soft Payments 2/2',
     type: 'TV, OLV, DOOH',
@@ -710,7 +710,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/Profi_LAB_WEB.mp4',
+    video: '/videos/Profi_LAB_WEB.webm',
     client: 'Profi',
     subtitle: 'Heroes',
     type: 'DOOH, OLV',
@@ -720,7 +720,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/SMLT_NY_LAB_WEB.mp4',
+    video: '/videos/SMLT_NY_LAB_WEB.webm',
     client: 'Samolet',
     subtitle: 'Pre-New Year',
     type: 'TV, OLV, DOOH',
@@ -730,7 +730,7 @@ const projectsData = [
     }
   },
   {
-    video: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/Lab_Starbucks_Halloween.mp4',
+    video: '/videos/Starbucks_LAB_WEB.webm',
     client: 'Starbucks',
     subtitle: 'Halloween',
     type: 'SOCIALS',
@@ -740,7 +740,7 @@ const projectsData = [
     }
   },
   {
-    video: '/videos/Tbank_b2s_LAB_WEB.mp4',
+    video: '/videos/Tbank_b2s_LAB_WEB.webm',
     client: 'T-Bank',
     subtitle: 'Back2School',
     type: 'OLV',
@@ -894,6 +894,7 @@ function createGlowRing(radius, color, innerMult, outerMult, opacity) {
 const SPHERE_COUNT = 14;
 const SPHERE_RADIUS = 1.2;
 const ORBIT_DISTANCE = 12;
+const MIN_SPHERE_DISTANCE = 5.5; // Минимальная дистанция между центрами сфер
 
 const projects = projectsData.map((p, i) => ({
   name: `Project ${i + 1}`,
@@ -903,39 +904,76 @@ const projects = projectsData.map((p, i) => ({
   content: p.content,
 }));
 
+// Генерация позиций сфер с гарантированным минимальным расстоянием
+function generateSpherePositions(count, orbitDist, minDist) {
+  const positions = [];
+  const maxAttempts = 2000;
+
+  // Используем фиксированный seed для воспроизводимости (mulberry32)
+  let seed = 42;
+  function seededRandom() {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+
+  for (let i = 0; i < count; i++) {
+    let placed = false;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const theta = seededRandom() * Math.PI * 2;
+      const yNorm = 0.20 + seededRandom() * 0.75; // от 0.20 до 0.95 — верхняя полусфера
+      const rMult = 0.85 + seededRandom() * 0.30; // вариативность радиуса
+
+      const radiusAtY = Math.sqrt(1 - yNorm * yNorm) * rMult;
+      const x = radiusAtY * Math.cos(theta) * orbitDist;
+      const z = radiusAtY * Math.sin(theta) * orbitDist;
+      const y = yNorm * orbitDist * 0.65;
+
+      // Проверяем дистанцию до всех уже размещённых сфер
+      let tooClose = false;
+      for (const p of positions) {
+        const dx = x - p.x;
+        const dy = y - p.y;
+        const dz = z - p.z;
+        if (Math.sqrt(dx * dx + dy * dy + dz * dz) < minDist) {
+          tooClose = true;
+          break;
+        }
+      }
+
+      if (!tooClose) {
+        positions.push({ x, y, z });
+        placed = true;
+        break;
+      }
+    }
+
+    // Крайний fallback (не должен сработать при адекватных параметрах)
+    if (!placed) {
+      const theta = (i / count) * Math.PI * 2;
+      const yNorm = 0.3 + (i % 3) * 0.25;
+      const radiusAtY = Math.sqrt(1 - yNorm * yNorm);
+      positions.push({
+        x: radiusAtY * Math.cos(theta) * orbitDist,
+        y: yNorm * orbitDist * 0.65,
+        z: radiusAtY * Math.sin(theta) * orbitDist,
+      });
+    }
+  }
+  return positions;
+}
+
+const spherePositions = generateSpherePositions(SPHERE_COUNT, ORBIT_DISTANCE, MIN_SPHERE_DISTANCE);
+
 const spheres = [];
 const sphereGroups = [];
 
 projects.forEach((project, i) => {
   const group = new THREE.Group();
 
-  // Хаотичное распределение в верхней полусфере (текст не залезает на Землю)
-  const presetPositions = [
-    // Оригинальные 5
-    { theta: 0.4,  y: 0.75, r: 1.0  },
-    { theta: 2.3,  y: 0.45, r: 0.95 },
-    { theta: 4.5,  y: 0.85, r: 0.88 },
-    { theta: 1.5,  y: 0.55, r: 1.08 },
-    { theta: 5.3,  y: 0.30, r: 0.92 },
-    // Новые 9
-    { theta: 3.4,  y: 0.65, r: 1.04 },
-    { theta: 0.9,  y: 0.35, r: 0.98 },
-    { theta: 5.8,  y: 0.70, r: 0.90 },
-    { theta: 2.8,  y: 0.80, r: 1.02 },
-    { theta: 4.0,  y: 0.40, r: 0.94 },
-    { theta: 1.0,  y: 0.60, r: 1.06 },
-    { theta: 3.8,  y: 0.25, r: 0.96 },
-    { theta: 5.0,  y: 0.55, r: 1.00 },
-    { theta: 1.8,  y: 0.90, r: 0.86 },
-  ];
-  const preset = presetPositions[i];
-  
-  const radiusAtY = Math.sqrt(1 - preset.y * preset.y) * preset.r;
-  const x = radiusAtY * Math.cos(preset.theta) * ORBIT_DISTANCE;
-  const z = radiusAtY * Math.sin(preset.theta) * ORBIT_DISTANCE;
-  const posY = preset.y * ORBIT_DISTANCE * 0.65;
-
-  group.position.set(x, posY, z);
+  const pos = spherePositions[i];
+  group.position.set(pos.x, pos.y, pos.z);
 
   // Сфера — видео-текстура с лёгким glass-эффектом
   const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 64);
@@ -973,7 +1011,7 @@ projects.forEach((project, i) => {
   scene.add(label);
 
   group.userData = {
-    baseY: posY,
+    baseY: pos.y,
     phase: i * ((Math.PI * 2) / SPHERE_COUNT),
     ring,
     label,
@@ -1239,5 +1277,47 @@ function animate() {
   
   composer.render();
 }
+
+// ==========================================
+// 15. Loading screen — отслеживаем готовность видео
+// ==========================================
+
+(function initLoadingScreen() {
+  const loadingEl = document.getElementById('loading-screen');
+  const progressBar = document.getElementById('load-progress');
+  if (!loadingEl) return;
+
+  const total = videoTextures.length;
+  let ready = 0;
+
+  function tick() {
+    ready++;
+    const pct = Math.min(Math.round((ready / total) * 100), 100);
+    if (progressBar) progressBar.style.width = pct + '%';
+    if (ready >= total) dismiss();
+  }
+
+  function dismiss() {
+    // Небольшая задержка для плавности
+    setTimeout(() => {
+      loadingEl.classList.add('hidden');
+      // Удаляем из DOM после анимации
+      loadingEl.addEventListener('transitionend', () => loadingEl.remove(), { once: true });
+    }, 400);
+  }
+
+  videoTextures.forEach(({ video }) => {
+    if (video.readyState >= 3) {
+      tick();
+    } else {
+      video.addEventListener('canplaythrough', tick, { once: true });
+    }
+  });
+
+  // Таймаут-страховка: если за 8 секунд не всё загрузилось, всё равно показываем
+  setTimeout(() => {
+    if (!loadingEl.classList.contains('hidden')) dismiss();
+  }, 8000);
+})();
 
 animate();
