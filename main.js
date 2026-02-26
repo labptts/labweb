@@ -198,7 +198,7 @@ controls.autoRotateSpeed = 0.08;
 if (isMobile) {
   controls.enabled = false;
   controls.autoRotate = false;
-  controls.minPolarAngle = 0.5;
+  controls.minPolarAngle = 0.1;
   controls.maxPolarAngle = Math.PI / 2 + 0.25;
 }
 
@@ -206,7 +206,7 @@ if (isMobile) {
 let introComplete = !isMobile;
 const introState = { phi: Math.PI / 2, theta: 0 };
 const INTRO_END_PHI = 1.3;          // ~15° above equator — Earth visible at bottom
-const INTRO_END_THETA = Math.PI * 0.55; // ~100° gentle spin
+const INTRO_END_THETA = -Math.PI * 0.55; // ~100° gentle spin to the right
 
 function playIntroAnimation() {
   if (!isMobile) return;
@@ -218,7 +218,13 @@ function playIntroAnimation() {
     ease: 'power2.inOut',
     onComplete: () => {
       introComplete = true;
+      // Sync camera position so OrbitControls picks up from here (no jump)
+      camera.position.setFromSpherical(
+        new THREE.Spherical(0.001, INTRO_END_PHI, INTRO_END_THETA)
+      );
+      camera.lookAt(controls.target);
       controls.enabled = true;
+      controls.update(); // sync internal state before autoRotate
       controls.autoRotate = true;
     }
   });
