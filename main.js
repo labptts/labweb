@@ -1104,78 +1104,55 @@ const projects = projectsData.map((p, i) => ({
 // Генерация позиций сфер с гарантированным минимальным расстоянием
 function generateSpherePositions(count, orbitDist, minDist) {
   const positions = [];
+  const maxAttempts = 2000;
 
-  if (isMobile) {
-    // Мобилка: равномерное распределение по сфере (Fibonacci / golden angle)
-    // Сферы размещаются по всей сфере с лёгким вертикальным сжатием
-    const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~2.399
+  let seed = 42;
+  function seededRandom() {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
 
-    for (let i = 0; i < count; i++) {
-      // Равномерное распределение по высоте от -0.6 до 0.85
-      const yNorm = -0.6 + (i / (count - 1)) * 1.45;
-      const theta = goldenAngle * i;
+  for (let i = 0; i < count; i++) {
+    let placed = false;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const theta = seededRandom() * Math.PI * 2;
+      const yNorm = 0.20 + seededRandom() * 0.75;
+      const rMult = 0.85 + seededRandom() * 0.30;
 
-      const radiusAtY = Math.sqrt(1 - yNorm * yNorm);
-      const rMult = 0.90 + (i % 3) * 0.08; // лёгкая вариативность радиуса
+      const radiusAtY = Math.sqrt(1 - yNorm * yNorm) * rMult;
+      const x = radiusAtY * Math.cos(theta) * orbitDist;
+      const z = radiusAtY * Math.sin(theta) * orbitDist;
+      const y = yNorm * orbitDist * 0.65;
 
-      const x = radiusAtY * Math.cos(theta) * orbitDist * rMult;
-      const z = radiusAtY * Math.sin(theta) * orbitDist * rMult;
-      const y = yNorm * orbitDist * 0.55;
-
-      positions.push({ x, y, z });
-    }
-  } else {
-    // Десктоп: оригинальный рандомный алгоритм
-    const maxAttempts = 2000;
-
-    let seed = 42;
-    function seededRandom() {
-      seed = (seed + 0x6D2B79F5) | 0;
-      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    }
-
-    for (let i = 0; i < count; i++) {
-      let placed = false;
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const theta = seededRandom() * Math.PI * 2;
-        const yNorm = 0.20 + seededRandom() * 0.75;
-        const rMult = 0.85 + seededRandom() * 0.30;
-
-        const radiusAtY = Math.sqrt(1 - yNorm * yNorm) * rMult;
-        const x = radiusAtY * Math.cos(theta) * orbitDist;
-        const z = radiusAtY * Math.sin(theta) * orbitDist;
-        const y = yNorm * orbitDist * 0.65;
-
-        let tooClose = false;
-        for (const p of positions) {
-          const dx = x - p.x;
-          const dy = y - p.y;
-          const dz = z - p.z;
-          if (Math.sqrt(dx * dx + dy * dy + dz * dz) < minDist) {
-            tooClose = true;
-            break;
-          }
-        }
-
-        if (!tooClose) {
-          positions.push({ x, y, z });
-          placed = true;
+      let tooClose = false;
+      for (const p of positions) {
+        const dx = x - p.x;
+        const dy = y - p.y;
+        const dz = z - p.z;
+        if (Math.sqrt(dx * dx + dy * dy + dz * dz) < minDist) {
+          tooClose = true;
           break;
         }
       }
 
-      if (!placed) {
-        const theta = (i / count) * Math.PI * 2;
-        const yNorm = 0.3 + (i % 3) * 0.25;
-        const radiusAtY = Math.sqrt(1 - yNorm * yNorm);
-        positions.push({
-          x: radiusAtY * Math.cos(theta) * orbitDist,
-          y: yNorm * orbitDist * 0.65,
-          z: radiusAtY * Math.sin(theta) * orbitDist,
-        });
+      if (!tooClose) {
+        positions.push({ x, y, z });
+        placed = true;
+        break;
       }
+    }
+
+    if (!placed) {
+      const theta = (i / count) * Math.PI * 2;
+      const yNorm = 0.3 + (i % 3) * 0.25;
+      const radiusAtY = Math.sqrt(1 - yNorm * yNorm);
+      positions.push({
+        x: radiusAtY * Math.cos(theta) * orbitDist,
+        y: yNorm * orbitDist * 0.65,
+        z: radiusAtY * Math.sin(theta) * orbitDist,
+      });
     }
   }
   return positions;
