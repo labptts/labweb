@@ -26,7 +26,8 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   500
 );
-camera.position.set(0, 0, 0.001);
+const mobileStartY = isMobile ? 3.5 : 0;
+camera.position.set(0, mobileStartY, 0.001);
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -193,6 +194,10 @@ controls.dampingFactor = 0.06;
 controls.rotateSpeed = -0.4; // Инвертированное управление (drag-стиль)
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.08;
+if (isMobile) {
+  controls.target.set(0, mobileStartY, 0);
+  controls.update();
+}
 
 // ==========================================
 // 4. Освещение (премиальное, холодные тона)
@@ -1420,7 +1425,7 @@ let lazyVideoLastCheck = -1; // throttle для lazy video проверки
 
 // Параметры для camera drift
 const cameraDrift = {
-  baseTarget: new THREE.Vector3(0, 0, 0),
+  baseTarget: new THREE.Vector3(0, mobileStartY, 0),
   offset: new THREE.Vector3(),
 };
 
