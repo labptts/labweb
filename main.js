@@ -29,11 +29,11 @@ const camera = new THREE.PerspectiveCamera(
 camera.position.set(0, 0, 0.001);
 
 const renderer = new THREE.WebGLRenderer({
-  antialias: !isMobile,
-  powerPreference: isMobile ? 'default' : 'high-performance',
+  antialias: true,
+  powerPreference: 'high-performance',
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -69,12 +69,10 @@ function restoreMaterial(obj) {
 }
 
 // Render target для bloom pass
-const bloomRTWidth = isMobile ? Math.floor(window.innerWidth / 2) : window.innerWidth;
-const bloomRTHeight = isMobile ? Math.floor(window.innerHeight / 2) : window.innerHeight;
 const renderTarget = new THREE.WebGLRenderTarget(
-  bloomRTWidth,
-  bloomRTHeight,
-  { type: isMobile ? THREE.UnsignedByteType : THREE.HalfFloatType }
+  window.innerWidth,
+  window.innerHeight,
+  { type: THREE.HalfFloatType }
 );
 
 // Bloom composer (только для bloom объектов)
@@ -83,10 +81,10 @@ bloomComposer.renderToScreen = false;
 bloomComposer.addPass(new RenderPass(scene, camera));
 
 const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(bloomRTWidth, bloomRTHeight),
-  isMobile ? 0.8 : 1.2,   // strength
-  isMobile ? 0.3 : 0.6,   // radius
-  isMobile ? 0.3 : 0.1    // threshold
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  1.2,   // strength
+  0.6,   // radius
+  0.1    // threshold
 );
 bloomComposer.addPass(bloomPass);
 
@@ -172,13 +170,14 @@ const FilmGrainShader = {
   `
 };
 
-// На мобильных полностью пропускаем grain pass для экономии GPU
-if (!isMobile) {
-  const grainPass = new ShaderPass(FilmGrainShader);
-  composer.addPass(grainPass);
-  // Сохраняем ссылку для обновления в animate
-  window.__grainPass = grainPass;
+const grainPass = new ShaderPass(FilmGrainShader);
+
+// Уменьшаем grain на мобильных
+if (window.innerWidth < 768) {
+  grainPass.uniforms.uIntensity.value = 0.018;
 }
+
+composer.addPass(grainPass);
 
 composer.addPass(new OutputPass());
 
@@ -415,14 +414,9 @@ function createTwinklingStarLayer(count, minR, maxR, size, color, opacity) {
 }
 
 // Более премиальные звёзды - меньше и тоньше, с мерцанием
-if (isMobile) {
-  scene.add(createTwinklingStarLayer(200, 80, 200, 0.4, 0xffffff, 0.9));
-  scene.add(createTwinklingStarLayer(300, 60, 220, 0.2, 0xddeeff, 0.5));
-} else {
-  scene.add(createTwinklingStarLayer(400, 80, 200, 0.4, 0xffffff, 0.9));
-  scene.add(createTwinklingStarLayer(800, 60, 220, 0.2, 0xddeeff, 0.5));
-  scene.add(createTwinklingStarLayer(1500, 50, 250, 0.1, 0xaabbdd, 0.25));
-}
+scene.add(createTwinklingStarLayer(400, 80, 200, 0.4, 0xffffff, 0.9));
+scene.add(createTwinklingStarLayer(800, 60, 220, 0.2, 0xddeeff, 0.5));
+scene.add(createTwinklingStarLayer(1500, 50, 250, 0.1, 0xaabbdd, 0.25));
 
 // ==========================================
 // 5.5 Пылевые частицы (Dust Particles)
@@ -464,7 +458,7 @@ function createDustParticles(count) {
   return points;
 }
 
-const dustParticles = createDustParticles(isMobile ? 50 : 200);
+const dustParticles = createDustParticles(200);
 dustParticles.layers.enable(BLOOM_LAYER);
 scene.add(dustParticles);
 
@@ -477,8 +471,7 @@ function createEarthWithAtmosphere() {
   
   // Большая сфера Земли (видимая сверху)
   const earthRadius = 180;
-  const earthSegs = isMobile ? 48 : 128;
-  const earthGeometry = new THREE.SphereGeometry(earthRadius, earthSegs, earthSegs);
+  const earthGeometry = new THREE.SphereGeometry(earthRadius, 128, 128);
   
   // Шейдерный материал для тёмной Земли с огнями городов
   const earthMaterial = new THREE.ShaderMaterial({
@@ -844,7 +837,14 @@ function createVideoTexture(videoSrc) {
 // На мобилке одновременно активны только MAX_ACTIVE_VIDEOS ближайших к камере видео.
 // Остальные показывают статичный постер-кадр. Видео загружаются/выгружаются динамически.
 
-const MAX_ACTIVE_VIDEOS = isMobile ? 4 : 999; // на десктопе — без лимита
+// ==========================================
+// 7b. Frustum-based Lazy Video System
+// ==========================================
+// Видео загружаются/воспроизводятся только для сфер, которые видны на экране
+// (или почти видны — с запасом). Невидимые сферы показывают статичный кадр.
+// При повороте камеры видео плавно включаются и выключаются.
+
+const FRUSTUM_MARGIN = 0.35; // Запас за пределами экрана (0.35 = ~35% ширины экрана)
 
 // Создаёт «ленивую» видео-текстуру: начинает с placeholder, видео по запросу
 function createLazyVideoTexture(videoSrc) {
@@ -870,13 +870,13 @@ function createLazyVideoTexture(videoSrc) {
   const entry = {
     videoSrc,
     video: null,
-    texture: placeholderTexture,        // текущая текстура (placeholder или видео)
-    videoTexture: null,                  // VideoTexture когда активна
+    texture: placeholderTexture,
+    videoTexture: null,
     placeholderTexture,
     type: 'video',
     active: false,
+    isLazy: true,
 
-    // Активировать видео (загрузить и играть)
     activate() {
       if (this.active) return;
       this.active = true;
@@ -918,7 +918,6 @@ function createLazyVideoTexture(videoSrc) {
       self.texture = vTex;
     },
 
-    // Деактивировать видео (освободить память)
     deactivate() {
       if (!this.active) return;
       this.active = false;
@@ -926,7 +925,7 @@ function createLazyVideoTexture(videoSrc) {
       if (this.video) {
         this.video.pause();
         this.video.removeAttribute('src');
-        this.video.load(); // Освобождаем буферы декодера
+        this.video.load();
         this.video = null;
       }
       if (this.videoTexture) {
@@ -955,14 +954,11 @@ function createImageTexture(imageSrc) {
 }
 
 // Создаём текстуры для всех проектов
-// На мобилке видео создаются как lazy (загружаются по близости к камере)
-// На десктопе — все сразу
+// Все видео — lazy: загружаются только когда сфера видна на экране
 const projectTextures = projectsData.map(p => {
-  if (p.video) {
-    return isMobile ? createLazyVideoTexture(p.video) : createVideoTexture(p.video);
-  }
+  if (p.video) return createLazyVideoTexture(p.video);
   if (p.image) return createImageTexture(p.image);
-  return isMobile ? createLazyVideoTexture('') : createVideoTexture('');
+  return createLazyVideoTexture('');
 });
 
 // ==========================================
@@ -1143,8 +1139,7 @@ projects.forEach((project, i) => {
   group.position.set(pos.x, pos.y, pos.z);
 
   // Сфера — текстура (видео или картинка) с лёгким glass-эффектом
-  const sphereSegs = isMobile ? 32 : 64;
-  const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, sphereSegs, sphereSegs);
+  const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 64);
   const projectTexture = projectTextures[i].texture;
   const material = new THREE.MeshPhysicalMaterial({
     map: projectTexture,
@@ -1378,16 +1373,14 @@ window.addEventListener('resize', () => {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
-  renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   composer.setSize(w, h);
   bloomComposer.setSize(w, h);
   bloomPass.resolution.set(w, h);
   
-  // Обновляем grain для десктопа
-  if (window.__grainPass) {
-    window.__grainPass.uniforms.uIntensity.value = 0.04;
-    window.__grainPass.uniforms.uResolution.value.set(w, h);
-  }
+  // Обновляем grain
+  grainPass.uniforms.uIntensity.value = w < 768 ? 0.018 : 0.04;
+  grainPass.uniforms.uResolution.value.set(w, h);
 });
 
 // ==========================================
@@ -1409,8 +1402,8 @@ function animate() {
   const elapsed = clock.getElapsedTime();
 
   // Film Grain обновление времени
-  if (window.__grainPass && window.__grainPass.uniforms.uTime) {
-    window.__grainPass.uniforms.uTime.value = elapsed;
+  if (grainPass.uniforms.uTime) {
+    grainPass.uniforms.uTime.value = elapsed;
   }
   
   // Обновляем мерцание звёзд
@@ -1477,29 +1470,51 @@ function animate() {
     earthScene.earthMaterial.uniforms.uTime.value = elapsed;
   }
 
-  // ---- Lazy Video: активируем ближайшие, деактивируем дальние ----
-  if (isMobile && Math.floor(elapsed * 2) !== lazyVideoLastCheck) {
-    lazyVideoLastCheck = Math.floor(elapsed * 2); // ~2 раза в секунду
+  // ---- Frustum-based Lazy Video: включаем видео для видимых сфер ----
+  if (Math.floor(elapsed * 3) !== lazyVideoLastCheck) {
+    lazyVideoLastCheck = Math.floor(elapsed * 3); // ~3 раза в секунду
 
-    const camPos = camera.position;
-    // Собираем дистанции для каждой сферы
-    const dists = sphereGroups.map((group, i) => {
+    // Обновляем frustum камеры
+    camera.updateMatrixWorld();
+    const projScreenMatrix = new THREE.Matrix4();
+    projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    const frustum = new THREE.Frustum();
+    frustum.setFromProjectionMatrix(projScreenMatrix);
+
+    // Расширенный frustum: добавляем запас, чтобы видео включалось
+    // когда сфера ещё «почти видна» (за краем экрана)
+    // Для этого проецируем позицию сферы в NDC и проверяем с запасом
+    const ndcLimit = 1.0 + FRUSTUM_MARGIN;
+
+    const shouldBeActive = new Set();
+
+    for (let i = 0; i < sphereGroups.length; i++) {
       const wp = new THREE.Vector3();
-      group.getWorldPosition(wp);
-      return { i, dist: wp.distanceTo(camPos) };
-    });
-    dists.sort((a, b) => a.dist - b.dist);
+      sphereGroups[i].getWorldPosition(wp);
 
-    // Ближайшие MAX_ACTIVE_VIDEOS получают видео, остальные — placeholder
-    const shouldBeActive = new Set(dists.slice(0, MAX_ACTIVE_VIDEOS).map(d => d.i));
+      // Проверяем сначала стандартный фрустум (быстрая проверка)
+      const sphereBound = new THREE.Sphere(wp, SPHERE_RADIUS);
+      if (frustum.intersectsSphere(sphereBound)) {
+        shouldBeActive.add(i);
+        continue;
+      }
 
+      // Расширенная проверка: проецируем в NDC с запасом
+      const ndc = wp.clone().project(camera);
+      if (ndc.z > 0 && ndc.z < 1 &&
+          Math.abs(ndc.x) < ndcLimit &&
+          Math.abs(ndc.y) < ndcLimit) {
+        shouldBeActive.add(i);
+      }
+    }
+
+    // Активируем/деактивируем видео
     for (let i = 0; i < projectTextures.length; i++) {
       const pt = projectTextures[i];
-      if (!pt.activate) continue; // не lazy (картинка или десктоп)
+      if (!pt.isLazy) continue; // пропускаем картинки
 
       if (shouldBeActive.has(i) && !pt.active) {
         pt.activate();
-        // Обновляем текстуру на материале сферы
         const mesh = spheres[i];
         if (mesh) {
           mesh.material.map = pt.texture;
@@ -1521,18 +1536,12 @@ function animate() {
   controls.update();
   checkHover();
   
-  if (isMobile) {
-    // На мобилке — простой рендер через composer без selective bloom
-    // (один проход вместо двух, экономит ~50% GPU)
-    composer.render();
-  } else {
-    // Selective bloom: рендерим bloom только для объектов на BLOOM_LAYER
-    scene.traverse(darkenNonBloomed);
-    bloomComposer.render();
-    scene.traverse(restoreMaterial);
-    
-    composer.render();
-  }
+  // Selective bloom: рендерим bloom только для объектов на BLOOM_LAYER
+  scene.traverse(darkenNonBloomed);
+  bloomComposer.render();
+  scene.traverse(restoreMaterial);
+  
+  composer.render();
 }
 
 // ==========================================
@@ -1563,9 +1572,9 @@ function animate() {
     }, 400);
   }
 
-  projectTextures.forEach(({ video, type, activate }) => {
-    if (activate) {
-      // Lazy video (мобилка) — ещё не загружено, считаем готовым сразу
+  projectTextures.forEach(({ video, type, isLazy }) => {
+    if (isLazy) {
+      // Lazy video — ещё не загружено, считаем готовым сразу
       tick();
     } else if (type === 'image') {
       // Картинки загружаются быстро — считаем сразу
