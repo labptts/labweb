@@ -194,42 +194,6 @@ controls.rotateSpeed = -0.4; // Инвертированное управлен�
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.08;
 
-// Mobile: стартуем с заблокированными контролами до завершения intro
-if (isMobile) {
-  controls.enabled = false;
-  controls.autoRotate = false;
-  controls.minPolarAngle = 0.1;
-  controls.maxPolarAngle = Math.PI / 2 + 0.25;
-}
-
-// ---- Mobile intro animation state ----
-let introComplete = !isMobile;
-const introState = { phi: Math.PI / 2, theta: 0 };
-const INTRO_END_PHI = 1.3;          // ~15° above equator — Earth visible at bottom
-const INTRO_END_THETA = -Math.PI * 0.55; // ~100° gentle spin to the right
-
-function playIntroAnimation() {
-  if (!isMobile) return;
-
-  gsap.to(introState, {
-    phi: INTRO_END_PHI,
-    theta: INTRO_END_THETA,
-    duration: 3.5,
-    ease: 'power2.inOut',
-    onComplete: () => {
-      introComplete = true;
-      // Sync camera position so OrbitControls picks up from here (no jump)
-      camera.position.setFromSpherical(
-        new THREE.Spherical(0.001, INTRO_END_PHI, INTRO_END_THETA)
-      );
-      camera.lookAt(controls.target);
-      controls.enabled = true;
-      controls.update(); // sync internal state before autoRotate
-      controls.autoRotate = true;
-    }
-  });
-}
-
 // ==========================================
 // 4. Освещение (премиальное, холодные тона)
 // ==========================================
@@ -1496,19 +1460,10 @@ function animate() {
     dustParticles.geometry.attributes.position.needsUpdate = true;
   }
   
-  // Camera: intro animation OR normal drift
-  if (!introComplete) {
-    // Intro: GSAP анимирует introState, мы ставим камеру в сферические координаты
-    camera.position.setFromSpherical(
-      new THREE.Spherical(0.001, introState.phi, introState.theta)
-    );
-    camera.lookAt(controls.target);
-  } else {
-    // Subtle camera drift - лёгкое покачивание
-    cameraDrift.offset.x = Math.sin(elapsed * 0.15) * 0.03;
-    cameraDrift.offset.y = Math.cos(elapsed * 0.12) * 0.02;
-    controls.target.copy(cameraDrift.baseTarget).add(cameraDrift.offset);
-  }
+  // Subtle camera drift - лёгкое покачивание
+  cameraDrift.offset.x = Math.sin(elapsed * 0.15) * 0.03;
+  cameraDrift.offset.y = Math.cos(elapsed * 0.12) * 0.02;
+  controls.target.copy(cameraDrift.baseTarget).add(cameraDrift.offset);
 
   // Получаем направление камеры для ориентации колец
   const cameraDirection = new THREE.Vector3();
@@ -1614,9 +1569,7 @@ function animate() {
     }
   }
 
-  if (introComplete) {
-    controls.update();
-  }
+  controls.update();
   checkHover();
   
   // Selective bloom: рендерим bloom только для объектов на BLOOM_LAYER
@@ -1652,8 +1605,6 @@ function animate() {
       loadingEl.classList.add('hidden');
       // Удаляем из DOM после анимации
       loadingEl.addEventListener('transitionend', () => loadingEl.remove(), { once: true });
-      // Запускаем intro-анимацию камеры на мобильной версии
-      playIntroAnimation();
     }, 400);
   }
 
