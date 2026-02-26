@@ -243,6 +243,42 @@
       }
     }
 
+    /* Gallery в модалке */
+    .modal-gallery {
+      max-height: 60vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: #000;
+    }
+
+    .modal-gallery::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .modal-gallery::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.03);
+    }
+
+    .modal-gallery::-webkit-scrollbar-thumb {
+      background: rgba(184, 255, 1, 0.25);
+      border-radius: 3px;
+    }
+
+    .gallery-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      object-fit: contain;
+    }
+
+    @media (max-width: 600px) {
+      .modal-gallery {
+        max-height: 50vh;
+      }
+    }
+
     /* Виньетка */
     #vignette {
       position: fixed;

@@ -748,6 +748,36 @@ const projectsData = [
       type: 'video',
       mp4Url: 'https://labstudioweb.s3.eu-north-1.amazonaws.com/LAB_Tbank.mp4'
     }
+  },
+  {
+    image: '/NOWRUZ1.webp',
+    client: 'Nowruz',
+    subtitle: 'Holiday Campaign',
+    type: 'KEY VISUAL',
+    content: {
+      type: 'gallery',
+      images: [
+        '/NOWRUZ1.webp',
+        '/NOWRUZ2.webp',
+        '/NOWRUZ3.webp',
+        '/NOWRUZ4.webp',
+        '/NOWRUZ5.webp',
+      ]
+    }
+  },
+  {
+    image: '/YandexDrive_Bags_1_1.webp',
+    client: 'Yandex Drive',
+    subtitle: 'Bags',
+    type: 'KEY VISUAL',
+    content: {
+      type: 'gallery',
+      images: [
+        '/YandexDrive_Bags_1_1.webp',
+        '/YandexDrive_Bags_1_2.webp',
+        '/YandexDrive_Bags_1_3.webp',
+      ]
+    }
   }
 ];
 
@@ -793,11 +823,29 @@ function createVideoTexture(videoSrc) {
   texture.center.set(0.5, 0.5);
   texture.offset.set(0.25, 0); // Сдвиг чтобы центр видео был спереди
 
-  return { video, texture };
+  return { video, texture, type: 'video' };
 }
 
-// Создаём текстуры для всех проектов
-const videoTextures = projectsData.map(p => createVideoTexture(p.video));
+// Создаёт текстуру из статичной картинки
+function createImageTexture(imageSrc) {
+  const loader = new THREE.TextureLoader();
+  const texture = loader.load(imageSrc);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = false;
+  texture.center.set(0.5, 0.5);
+  texture.offset.set(0.25, 0);
+
+  return { video: null, texture, type: 'image', loaded: loader };
+}
+
+// Создаём текстуры для всех проектов (видео или картинка)
+const projectTextures = projectsData.map(p => {
+  if (p.video) return createVideoTexture(p.video);
+  if (p.image) return createImageTexture(p.image);
+  return createVideoTexture(''); // fallback
+});
 
 // ==========================================
 // 8. Billboard-текст (Sprite — всегда к камере)
@@ -891,10 +939,10 @@ function createGlowRing(radius, color, innerMult, outerMult, opacity) {
 // 10. Генерация 5 сфер проектов
 // ==========================================
 
-const SPHERE_COUNT = 14;
+const SPHERE_COUNT = 16;
 const SPHERE_RADIUS = 1.2;
 const ORBIT_DISTANCE = 12;
-const MIN_SPHERE_DISTANCE = 5.5; // Минимальная дистанция между центрами сфер
+const MIN_SPHERE_DISTANCE = 5.0; // Минимальная дистанция между центрами сфер
 
 const projects = projectsData.map((p, i) => ({
   name: `Project ${i + 1}`,
@@ -975,12 +1023,12 @@ projects.forEach((project, i) => {
   const pos = spherePositions[i];
   group.position.set(pos.x, pos.y, pos.z);
 
-  // Сфера — видео-текстура с лёгким glass-эффектом
+  // Сфера — текстура (видео или картинка) с лёгким glass-эффектом
   const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 64);
-  const projectVideoTexture = videoTextures[i].texture;
+  const projectTexture = projectTextures[i].texture;
   const material = new THREE.MeshPhysicalMaterial({
-    map: projectVideoTexture,
-    emissiveMap: projectVideoTexture,
+    map: projectTexture,
+    emissiveMap: projectTexture,
     emissive: new THREE.Color(0xffffff),
     emissiveIntensity: 0.15,
     roughness: 0.25,
@@ -1155,6 +1203,15 @@ function showModal(project) {
         </video>
       </div>
     `;
+  } else if (content && content.type === 'gallery' && content.images) {
+    const imagesHtml = content.images.map((src, idx) => `
+      <img src="${src}" alt="${client} ${idx + 1}" class="gallery-img" loading="lazy">
+    `).join('');
+    mediaHtml = `
+      <div class="modal-gallery">
+        ${imagesHtml}
+      </div>
+    `;
   }
   
   modalContent.innerHTML = `
@@ -1317,7 +1374,7 @@ function animate() {
   const progressBar = document.getElementById('load-progress');
   if (!loadingEl) return;
 
-  const total = videoTextures.length;
+  const total = projectTextures.length;
   let ready = 0;
 
   function tick() {
@@ -1336,11 +1393,18 @@ function animate() {
     }, 400);
   }
 
-  videoTextures.forEach(({ video }) => {
-    if (video.readyState >= 3) {
+  projectTextures.forEach(({ video, type }) => {
+    if (type === 'image') {
+      // Картинки загружаются быстро — считаем сразу
       tick();
+    } else if (video) {
+      if (video.readyState >= 3) {
+        tick();
+      } else {
+        video.addEventListener('canplaythrough', tick, { once: true });
+      }
     } else {
-      video.addEventListener('canplaythrough', tick, { once: true });
+      tick();
     }
   });
 
