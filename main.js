@@ -1086,13 +1086,43 @@ function onClickOrTouch(clientX, clientY) {
   }
 }
 
+// --- Разделение drag и click ---
+let pointerDownPos = { x: 0, y: 0 };
+let pointerDownTime = 0;
+const DRAG_THRESHOLD = 6;   // px
+const CLICK_MAX_TIME = 350; // ms
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  pointerDownPos.x = e.clientX;
+  pointerDownPos.y = e.clientY;
+  pointerDownTime = performance.now();
+});
+
 renderer.domElement.addEventListener('click', (e) => {
+  const dx = e.clientX - pointerDownPos.x;
+  const dy = e.clientY - pointerDownPos.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const elapsed = performance.now() - pointerDownTime;
+  if (dist > DRAG_THRESHOLD || elapsed > CLICK_MAX_TIME) return; // was a drag
   onClickOrTouch(e.clientX, e.clientY);
 });
+
+renderer.domElement.addEventListener('touchstart', (e) => {
+  if (e.touches.length > 0) {
+    pointerDownPos.x = e.touches[0].clientX;
+    pointerDownPos.y = e.touches[0].clientY;
+    pointerDownTime = performance.now();
+  }
+}, { passive: true });
 
 renderer.domElement.addEventListener('touchend', (e) => {
   if (e.changedTouches.length > 0) {
     const touch = e.changedTouches[0];
+    const dx = touch.clientX - pointerDownPos.x;
+    const dy = touch.clientY - pointerDownPos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const elapsed = performance.now() - pointerDownTime;
+    if (dist > DRAG_THRESHOLD || elapsed > CLICK_MAX_TIME) return;
     onClickOrTouch(touch.clientX, touch.clientY);
   }
 });
@@ -1318,6 +1348,51 @@ function animate() {
   setTimeout(() => {
     if (!loadingEl.classList.contains('hidden')) dismiss();
   }, 8000);
+})();
+
+// ==========================================
+// 16. Project List View — переключение режимов
+// ==========================================
+
+(function initProjectListView() {
+  const navBtn = document.getElementById('nav-project-list');
+  const listView = document.getElementById('project-list-view');
+  const plList = document.getElementById('pl-list');
+  if (!navBtn || !listView || !plList) return;
+
+  let isListMode = false;
+
+  // Генерируем список проектов
+  projectsData.forEach((p, i) => {
+    const li = document.createElement('li');
+    li.className = 'pl-item';
+    li.innerHTML = `
+      <div class="pl-left">
+        <span class="pl-client">${p.client}</span>
+        <span class="pl-subtitle">${p.subtitle}</span>
+      </div>
+      <span class="pl-type">${p.type}</span>
+    `;
+    li.addEventListener('click', () => {
+      showModal(projects[i]);
+    });
+    plList.appendChild(li);
+  });
+
+  navBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    isListMode = !isListMode;
+
+    if (isListMode) {
+      listView.classList.add('active');
+      navBtn.querySelector('.line1').textContent = 'Universe';
+      navBtn.querySelector('.line2').textContent = 'view';
+    } else {
+      listView.classList.remove('active');
+      navBtn.querySelector('.line1').textContent = 'Project';
+      navBtn.querySelector('.line2').textContent = 'list view';
+    }
+  });
 })();
 
 animate();
