@@ -26,8 +26,9 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   500
 );
-const mobileStartY = isMobile ? 3.5 : 0;
-camera.position.set(0, mobileStartY, 0.001);
+const mobileStartY = isMobile ? 2.0 : 0;
+const mobileStartX = isMobile ? 2.0 : 0;
+camera.position.set(mobileStartX, mobileStartY, 0.001);
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -195,7 +196,7 @@ controls.rotateSpeed = -0.4; // Инвертированное управлен�
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.08;
 if (isMobile) {
-  controls.target.set(0, mobileStartY, 0);
+  controls.target.set(mobileStartX, mobileStartY, 0);
   controls.update();
 }
 
@@ -1425,7 +1426,7 @@ let lazyVideoLastCheck = -1; // throttle для lazy video проверки
 
 // Параметры для camera drift
 const cameraDrift = {
-  baseTarget: new THREE.Vector3(0, mobileStartY, 0),
+  baseTarget: new THREE.Vector3(mobileStartX, mobileStartY, 0),
   offset: new THREE.Vector3(),
 };
 
