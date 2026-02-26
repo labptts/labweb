@@ -838,6 +838,108 @@ function createVideoTexture(videoSrc) {
   return { video, texture, type: 'video' };
 }
 
+// ==========================================
+// 7b. Lazy Video System (мобилка)
+// ==========================================
+// На мобилке одновременно активны только MAX_ACTIVE_VIDEOS ближайших к камере видео.
+// Остальные показывают статичный постер-кадр. Видео загружаются/выгружаются динамически.
+
+const MAX_ACTIVE_VIDEOS = isMobile ? 4 : 999; // на десктопе — без лимита
+
+// Создаёт «ленивую» видео-текстуру: начинает с placeholder, видео по запросу
+function createLazyVideoTexture(videoSrc) {
+  // Placeholder canvas (тёмный фон пока видео не активно)
+  const placeholderCanvas = document.createElement('canvas');
+  placeholderCanvas.width = 128;
+  placeholderCanvas.height = 128;
+  const pCtx = placeholderCanvas.getContext('2d');
+  const grad = pCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, '#1a1a2e');
+  grad.addColorStop(1, '#08080f');
+  pCtx.fillStyle = grad;
+  pCtx.fillRect(0, 0, 128, 128);
+
+  const placeholderTexture = new THREE.CanvasTexture(placeholderCanvas);
+  placeholderTexture.minFilter = THREE.LinearFilter;
+  placeholderTexture.magFilter = THREE.LinearFilter;
+  placeholderTexture.colorSpace = THREE.SRGBColorSpace;
+  placeholderTexture.generateMipmaps = false;
+  placeholderTexture.center.set(0.5, 0.5);
+  placeholderTexture.offset.set(0.25, 0);
+
+  const entry = {
+    videoSrc,
+    video: null,
+    texture: placeholderTexture,        // текущая текстура (placeholder или видео)
+    videoTexture: null,                  // VideoTexture когда активна
+    placeholderTexture,
+    type: 'video',
+    active: false,
+
+    // Активировать видео (загрузить и играть)
+    activate() {
+      if (this.active) return;
+      this.active = true;
+
+      const vid = document.createElement('video');
+      vid.crossOrigin = 'anonymous';
+      vid.loop = true;
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.preload = 'auto';
+      vid.setAttribute('playsinline', '');
+      vid.setAttribute('webkit-playsinline', '');
+      vid.src = this.videoSrc;
+
+      const self = this;
+      function tryPlay() {
+        const p = vid.play();
+        if (p !== undefined) {
+          p.catch(() => {
+            const h = () => { vid.play(); document.removeEventListener('click', h); document.removeEventListener('touchstart', h); };
+            document.addEventListener('click', h);
+            document.addEventListener('touchstart', h);
+          });
+        }
+      }
+      vid.addEventListener('canplaythrough', tryPlay, { once: true });
+      vid.load();
+
+      const vTex = new THREE.VideoTexture(vid);
+      vTex.minFilter = THREE.LinearFilter;
+      vTex.magFilter = THREE.LinearFilter;
+      vTex.colorSpace = THREE.SRGBColorSpace;
+      vTex.generateMipmaps = false;
+      vTex.center.set(0.5, 0.5);
+      vTex.offset.set(0.25, 0);
+
+      self.video = vid;
+      self.videoTexture = vTex;
+      self.texture = vTex;
+    },
+
+    // Деактивировать видео (освободить память)
+    deactivate() {
+      if (!this.active) return;
+      this.active = false;
+
+      if (this.video) {
+        this.video.pause();
+        this.video.removeAttribute('src');
+        this.video.load(); // Освобождаем буферы декодера
+        this.video = null;
+      }
+      if (this.videoTexture) {
+        this.videoTexture.dispose();
+        this.videoTexture = null;
+      }
+      this.texture = this.placeholderTexture;
+    }
+  };
+
+  return entry;
+}
+
 // Создаёт текстуру из статичной картинки
 function createImageTexture(imageSrc) {
   const loader = new THREE.TextureLoader();
@@ -852,11 +954,15 @@ function createImageTexture(imageSrc) {
   return { video: null, texture, type: 'image', loaded: loader };
 }
 
-// Создаём текстуры для всех проектов (видео или картинка)
+// Создаём текстуры для всех проектов
+// На мобилке видео создаются как lazy (загружаются по близости к камере)
+// На десктопе — все сразу
 const projectTextures = projectsData.map(p => {
-  if (p.video) return createVideoTexture(p.video);
+  if (p.video) {
+    return isMobile ? createLazyVideoTexture(p.video) : createVideoTexture(p.video);
+  }
   if (p.image) return createImageTexture(p.image);
-  return createVideoTexture(''); // fallback
+  return isMobile ? createLazyVideoTexture('') : createVideoTexture('');
 });
 
 // ==========================================
@@ -1289,6 +1395,7 @@ window.addEventListener('resize', () => {
 // ==========================================
 
 const clock = new THREE.Clock();
+let lazyVideoLastCheck = -1; // throttle для lazy video проверки
 
 // Параметры для camera drift
 const cameraDrift = {
@@ -1370,6 +1477,47 @@ function animate() {
     earthScene.earthMaterial.uniforms.uTime.value = elapsed;
   }
 
+  // ---- Lazy Video: активируем ближайшие, деактивируем дальние ----
+  if (isMobile && Math.floor(elapsed * 2) !== lazyVideoLastCheck) {
+    lazyVideoLastCheck = Math.floor(elapsed * 2); // ~2 раза в секунду
+
+    const camPos = camera.position;
+    // Собираем дистанции для каждой сферы
+    const dists = sphereGroups.map((group, i) => {
+      const wp = new THREE.Vector3();
+      group.getWorldPosition(wp);
+      return { i, dist: wp.distanceTo(camPos) };
+    });
+    dists.sort((a, b) => a.dist - b.dist);
+
+    // Ближайшие MAX_ACTIVE_VIDEOS получают видео, остальные — placeholder
+    const shouldBeActive = new Set(dists.slice(0, MAX_ACTIVE_VIDEOS).map(d => d.i));
+
+    for (let i = 0; i < projectTextures.length; i++) {
+      const pt = projectTextures[i];
+      if (!pt.activate) continue; // не lazy (картинка или десктоп)
+
+      if (shouldBeActive.has(i) && !pt.active) {
+        pt.activate();
+        // Обновляем текстуру на материале сферы
+        const mesh = spheres[i];
+        if (mesh) {
+          mesh.material.map = pt.texture;
+          mesh.material.emissiveMap = pt.texture;
+          mesh.material.needsUpdate = true;
+        }
+      } else if (!shouldBeActive.has(i) && pt.active) {
+        pt.deactivate();
+        const mesh = spheres[i];
+        if (mesh) {
+          mesh.material.map = pt.texture;
+          mesh.material.emissiveMap = pt.texture;
+          mesh.material.needsUpdate = true;
+        }
+      }
+    }
+  }
+
   controls.update();
   checkHover();
   
@@ -1415,8 +1563,11 @@ function animate() {
     }, 400);
   }
 
-  projectTextures.forEach(({ video, type }) => {
-    if (type === 'image') {
+  projectTextures.forEach(({ video, type, activate }) => {
+    if (activate) {
+      // Lazy video (мобилка) — ещё не загружено, считаем готовым сразу
+      tick();
+    } else if (type === 'image') {
       // Картинки загружаются быстро — считаем сразу
       tick();
     } else if (video) {
