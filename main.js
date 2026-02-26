@@ -26,8 +26,8 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   500
 );
-const mobileStartY = isMobile ? 0.5 : 0;
-const mobileStartX = isMobile ? 5.0 : 0;
+const mobileStartY = isMobile ? -1.5 : 0;
+const mobileStartX = isMobile ? 9.0 : 0;
 camera.position.set(mobileStartX, mobileStartY, 0.001);
 
 const renderer = new THREE.WebGLRenderer({
