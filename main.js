@@ -1062,7 +1062,7 @@ function createTextSprite(line1, line2, projectType = 'TV / DOOH') {
   });
 
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(isMobile ? 3.4 : 3.5, isMobile ? 1.7 : 1.75, 1);
+  sprite.scale.set(isMobile ? 2.8 : 3.5, isMobile ? 1.4 : 1.75, 1);
   return sprite;
 }
 
@@ -1089,9 +1089,9 @@ function createGlowRing(radius, color, innerMult, outerMult, opacity) {
 
 const SPHERE_COUNT = 16;
 // isMobile already defined at top of file
-const SPHERE_RADIUS = isMobile ? 1.15 : 1.2;
-const ORBIT_DISTANCE = 12;
-const MIN_SPHERE_DISTANCE = isMobile ? 4.5 : 5.0; // Минимальная дистанция между центрами сфер
+const SPHERE_RADIUS = isMobile ? 1.0 : 1.2;
+const ORBIT_DISTANCE = isMobile ? 16 : 12;
+const MIN_SPHERE_DISTANCE = isMobile ? 6.5 : 5.0; // Минимальная дистанция между центрами сфер
 
 const projects = projectsData.map((p, i) => ({
   name: `Project ${i + 1}`,
@@ -1101,64 +1101,84 @@ const projects = projectsData.map((p, i) => ({
   content: p.content,
 }));
 
-// Генерация позиций сфер с гарантированным минимальным расстоянием
+// Генерация позиций сфер: Fibonacci sphere + relaxation (отталкивание)
 function generateSpherePositions(count, orbitDist, minDist) {
+  // 1. Начальное размещение: Fibonacci sphere (golden angle) — максимально равномерное
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
   const positions = [];
-  const maxAttempts = 2000;
-
-  let seed = 42;
-  function seededRandom() {
-    seed = (seed + 0x6D2B79F5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  }
 
   for (let i = 0; i < count; i++) {
-    let placed = false;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const theta = seededRandom() * Math.PI * 2;
-      const yNorm = 0.20 + seededRandom() * 0.75;
-      const rMult = 0.85 + seededRandom() * 0.30;
+    // Распределяем по верхней полусфере: yNorm от 0.15 до 0.92
+    const yNorm = 0.15 + ((i + 0.5) / count) * 0.77;
+    const theta = goldenAngle * i;
 
-      const radiusAtY = Math.sqrt(1 - yNorm * yNorm) * rMult;
-      const x = radiusAtY * Math.cos(theta) * orbitDist;
-      const z = radiusAtY * Math.sin(theta) * orbitDist;
-      const y = yNorm * orbitDist * 0.65;
+    const radiusAtY = Math.sqrt(1 - yNorm * yNorm);
+    const x = radiusAtY * Math.cos(theta) * orbitDist;
+    const z = radiusAtY * Math.sin(theta) * orbitDist;
+    const y = yNorm * orbitDist * 0.65;
 
-      let tooClose = false;
-      for (const p of positions) {
-        const dx = x - p.x;
-        const dy = y - p.y;
-        const dz = z - p.z;
-        if (Math.sqrt(dx * dx + dy * dy + dz * dz) < minDist) {
-          tooClose = true;
-          break;
+    positions.push({ x, y, z });
+  }
+
+  // 2. Relaxation: итеративное отталкивание сфер друг от друга
+  //    Сферы «расталкиваются» если слишком близко, оставаясь на орбите
+  const relaxIterations = 80;
+  const repulsionStrength = 0.3;
+
+  for (let iter = 0; iter < relaxIterations; iter++) {
+    for (let i = 0; i < count; i++) {
+      let fx = 0, fy = 0, fz = 0;
+
+      for (let j = 0; j < count; j++) {
+        if (i === j) continue;
+        const dx = positions[i].x - positions[j].x;
+        const dy = positions[i].y - positions[j].y;
+        const dz = positions[i].z - positions[j].z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        if (dist < minDist * 1.5 && dist > 0.01) {
+          // Сила отталкивания обратно пропорциональна расстоянию
+          const force = repulsionStrength * (minDist * 1.5 - dist) / dist;
+          fx += dx * force;
+          fy += dy * force;
+          fz += dz * force;
         }
       }
 
-      if (!tooClose) {
-        positions.push({ x, y, z });
-        placed = true;
-        break;
-      }
-    }
+      // Применяем силу
+      positions[i].x += fx;
+      positions[i].y += fy;
+      positions[i].z += fz;
 
-    if (!placed) {
-      const theta = (i / count) * Math.PI * 2;
-      const yNorm = 0.3 + (i % 3) * 0.25;
-      const radiusAtY = Math.sqrt(1 - yNorm * yNorm);
-      positions.push({
-        x: radiusAtY * Math.cos(theta) * orbitDist,
-        y: yNorm * orbitDist * 0.65,
-        z: radiusAtY * Math.sin(theta) * orbitDist,
-      });
+      // Проецируем обратно на орбитальную поверхность (эллипсоид)
+      // Горизонтальный радиус = orbitDist, вертикальный маштаб ~0.65
+      const hDist = Math.sqrt(positions[i].x * positions[i].x + positions[i].z * positions[i].z);
+      if (hDist > 0.01) {
+        // Нормализуем горизонтальное расстояние к ~orbitDist с лёгкой вариативностью
+        const targetH = orbitDist * (0.85 + 0.30 * (hDist / (hDist + orbitDist)));
+        const scale = targetH / hDist;
+        positions[i].x *= scale;
+        positions[i].z *= scale;
+      }
+
+      // Ограничиваем Y в разумных пределах
+      const maxY = orbitDist * 0.65 * 0.95;
+      const minY = orbitDist * 0.65 * 0.10;
+      positions[i].y = Math.max(minY, Math.min(maxY, positions[i].y));
     }
   }
+
   return positions;
 }
 
 const spherePositions = generateSpherePositions(SPHERE_COUNT, ORBIT_DISTANCE, MIN_SPHERE_DISTANCE);
+
+// На мобильных центрируем сферы вокруг позиции камеры, чтобы они не кучковались в одном месте
+if (isMobile) {
+  spherePositions.forEach(p => {
+    p.x += mobileStartX;
+  });
+}
 
 const spheres = [];
 const sphereGroups = [];
@@ -1490,14 +1510,15 @@ function animate() {
       const sphereWorldPos = new THREE.Vector3();
       group.getWorldPosition(sphereWorldPos);
       
-      const labelOffset = cameraUp.clone().multiplyScalar(-(SPHERE_RADIUS + 1.5));
+      const labelGap = isMobile ? 1.2 : 1.5;
+      const labelOffset = cameraUp.clone().multiplyScalar(-(SPHERE_RADIUS + labelGap));
       label.position.copy(sphereWorldPos).add(labelOffset);
       
       // Компенсируем перспективное уменьшение: дальние лейблы масштабируем крупнее
       if (isMobile) {
         const dist = sphereWorldPos.distanceTo(camera.position);
-        const baseScale = 3.4;
-        const scaleFactor = Math.max(1.0, dist / 10); // нормализуем к ~10 единицам
+        const baseScale = 2.8;
+        const scaleFactor = Math.min(1.5, Math.max(1.0, dist / 14));
         label.scale.set(baseScale * scaleFactor, (baseScale / 2) * scaleFactor, 1);
       }
     }
