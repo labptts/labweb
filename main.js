@@ -1089,7 +1089,7 @@ function createGlowRing(radius, color, innerMult, outerMult, opacity) {
 
 const SPHERE_COUNT = 16;
 // isMobile already defined at top of file
-const SPHERE_RADIUS = isMobile ? 1.0 : 1.2;
+const SPHERE_RADIUS = isMobile ? 1.5 : 1.2;
 const ORBIT_DISTANCE = isMobile ? 16 : 12;
 const MIN_SPHERE_DISTANCE = isMobile ? 6.5 : 5.0; // Минимальная дистанция между центрами сфер
 
