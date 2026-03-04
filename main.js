@@ -849,13 +849,23 @@ const FRUSTUM_MARGIN = 0.35;
 // Глобальный blob-кеш для видеоданных
 const videoBlobCache = new Map();
 
+// Прогресс загрузки blob-ов (используется loading screen)
+const blobLoadProgress = { loaded: 0, total: 0, done: false, onProgress: null };
+
 // Фоновая предзагрузка всех видео в blob
 function preloadVideoBlobs(urls) {
-  urls.forEach(url => {
-    if (!url || videoBlobCache.has(url)) return;
+  const validUrls = urls.filter(url => url);
+  blobLoadProgress.total = validUrls.length;
+
+  const promises = validUrls.map(url => {
+    if (videoBlobCache.has(url)) {
+      blobLoadProgress.loaded++;
+      if (blobLoadProgress.onProgress) blobLoadProgress.onProgress();
+      return Promise.resolve();
+    }
     // Ставим null как маркер «загружается»
     videoBlobCache.set(url, null);
-    fetch(url)
+    return fetch(url)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.blob();
@@ -867,7 +877,16 @@ function preloadVideoBlobs(urls) {
       .catch(() => {
         // Не удалось — при активации загрузим напрямую
         videoBlobCache.delete(url);
+      })
+      .finally(() => {
+        blobLoadProgress.loaded++;
+        if (blobLoadProgress.onProgress) blobLoadProgress.onProgress();
       });
+  });
+
+  Promise.allSettled(promises).then(() => {
+    blobLoadProgress.done = true;
+    if (blobLoadProgress.onProgress) blobLoadProgress.onProgress();
   });
 }
 
@@ -1059,10 +1078,13 @@ function createTextSprite(line1, line2, projectType = 'TV / DOOH') {
     blending: THREE.NormalBlending,
     depthWrite: false,
     depthTest: false,
+    fog: false,
   });
 
   const sprite = new THREE.Sprite(material);
   sprite.scale.set(isMobile ? 2.8 : 3.5, isMobile ? 1.4 : 1.75, 1);
+  sprite.frustumCulled = false;
+  sprite.renderOrder = 999;
   return sprite;
 }
 
@@ -1613,18 +1635,8 @@ function animate() {
   const progressBar = document.getElementById('load-progress');
   if (!loadingEl) return;
 
-  const total = projectTextures.length;
-  let ready = 0;
-
-  function tick() {
-    ready++;
-    const pct = Math.min(Math.round((ready / total) * 100), 100);
-    if (progressBar) progressBar.style.width = pct + '%';
-    if (ready >= total) dismiss();
-  }
-
   function dismiss() {
-    // Небольшая задержка для плавности
+    if (loadingEl.classList.contains('hidden')) return;
     setTimeout(() => {
       loadingEl.classList.add('hidden');
       // Удаляем из DOM после анимации
@@ -1632,28 +1644,27 @@ function animate() {
     }, 400);
   }
 
-  projectTextures.forEach(({ video, type, isLazy }) => {
-    if (isLazy) {
-      // Lazy video — ещё не загружено, считаем готовым сразу
-      tick();
-    } else if (type === 'image') {
-      // Картинки загружаются быстро — считаем сразу
-      tick();
-    } else if (video) {
-      if (video.readyState >= 3) {
-        tick();
-      } else {
-        video.addEventListener('canplaythrough', tick, { once: true });
-      }
-    } else {
-      tick();
+  function updateProgress() {
+    const { loaded, total, done } = blobLoadProgress;
+    if (total > 0) {
+      const pct = Math.min(Math.round((loaded / total) * 100), 100);
+      if (progressBar) progressBar.style.width = pct + '%';
     }
-  });
+    if (done) dismiss();
+  }
 
-  // Таймаут-страховка: если за 8 секунд не всё загрузилось, всё равно показываем
+  // Подписываемся на прогресс blob-загрузки
+  blobLoadProgress.onProgress = updateProgress;
+
+  // Если уже загружено (мало вероятно, но на всякий случай)
+  if (blobLoadProgress.done) {
+    dismiss();
+  }
+
+  // Таймаут-страховка: на мобильных даём 15 секунд (медленные сети)
   setTimeout(() => {
     if (!loadingEl.classList.contains('hidden')) dismiss();
-  }, 8000);
+  }, isMobile ? 15000 : 10000);
 })();
 
 // ==========================================
@@ -1700,5 +1711,25 @@ function animate() {
     }
   });
 })();
+
+// ==========================================
+// 16b. Mobile PDF download fix
+// ==========================================
+if (isMobile) {
+  const downloadLink = document.getElementById('nav-download');
+  if (downloadLink) {
+    downloadLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      // On mobile, target="_blank" often silently fails for cross-origin PDFs.
+      // Try window.open first (works in most cases when triggered by user gesture),
+      // fallback to direct navigation.
+      const url = this.href;
+      const win = window.open(url, '_blank');
+      if (!win) {
+        window.location.href = url;
+      }
+    });
+  }
+}
 
 animate();
